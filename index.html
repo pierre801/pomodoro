@@ -9,12 +9,16 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- Tailwind CSS pour le style -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Styles personnalisés pour les icônes -->
     <style>
         body { margin: 0; padding: 0; font-family: 'Poppins', sans-serif; }
+        
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Icones CSS pures */
         .play-icon {
             width: 0; height: 0;
             border-left: 16px solid currentColor;
@@ -52,21 +56,67 @@
             transform: translate(-50%, -50%) rotate(45deg);
         }
         .cross-icon::after { transform: translate(-50%, -50%) rotate(-45deg); }
+
+        /* Cœurs pour les vies */
+        .heart-icon {
+            width: 24px; height: 24px;
+            display: inline-block;
+        }
+        /* SVG inline géré dans React, mais classe CSS prête */
+        .heart-fill { fill: #EF4444; }
+        .heart-empty { fill: #E5E7EB; stroke: #EF4444; stroke-width: 2; }
+        
+        /* Animation Game Over */
+        @keyframes popIn {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .modal-animate { animation: popIn 0.3s ease-out forwards; }
+
     </style>
 </head>
-<body class="min-h-screen bg-[#FBDEC4] text-slate-800 p-8">
+<body class="min-h-screen bg-[#FBDEC4] text-slate-800 p-4 md:p-8">
     <div id="root"></div>
     
-    <!-- React et Babel -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
-    <!-- API YouTube -->
     <script src="https://www.youtube.com/iframe_api"></script>
     
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
+
+        // Données des tuiles marketing (1h = 2 cycles de 30min environ incluant pauses)
+        // Note: Ici "cycles" = pas internes (Travail + Pause). Donc 1h = 2 pas (Travail) + 2 pas (Pause) = 4 pas ?
+        // L'utilisateur a dit "+8 cycles ça compte 1 tour". 
+        // 1 tour standard = 4 sessions de travail.
+        // Donc "8 cycles" dans l'interface utilisateur = 8 pas internes (4 Travail + 4 Pauses).
+        // Temps moyen : 
+        // 3h = 6 sessions de travail = 12 pas internes.
+        // 1h = 2 sessions de travail = 4 pas internes.
+        // 4h = 8 sessions de travail = 16 pas internes.
+
+        const MARKETING_PRESETS = [
+            { name: "Publications semaine", duration: 12 }, // 3h
+            { name: "Exemple de segmentation", duration: 12 }, // 3h
+            { name: "Personal branding", duration: 12 }, // 3h
+            { name: "Script vidéo", duration: 4 }, // 1h
+            { name: "Tournage", duration: 4 }, // 1h
+            { name: "Montage", duration: 16 }, // 4h
+        ];
+
+        // Composants Icones Cœur
+        const FullHeart = () => (
+            <svg viewBox="0 0 24 24" className="w-6 h-6 text-red-500 fill-current">
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+            </svg>
+        );
+
+        const EmptyHeart = () => (
+            <svg viewBox="0 0 24 24" className="w-6 h-6 text-red-500 fill-transparent stroke-current stroke-2">
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+            </svg>
+        );
 
         function PomodoroTimer() {
           // --- ETATS ---
@@ -74,6 +124,7 @@
           const [videoId, setVideoId] = useState('');
           const [isPlaylist, setIsPlaylist] = useState(false);
           const [playlistId, setPlaylistId] = useState('');
+          
           const [workTime, setWorkTime] = useState(25);
           const [shortBreak, setShortBreak] = useState(5);
           const [longBreak, setLongBreak] = useState(15);
@@ -81,21 +132,29 @@
           const [isRunning, setIsRunning] = useState(false);
           const [currentCycle, setCurrentCycle] = useState(1);
           const [isWorkSession, setIsWorkSession] = useState(true);
+          
           const [videoHistory, setVideoHistory] = useState([]);
           const [todayPomodoros, setTodayPomodoros] = useState(0);
           const [lastResetDate, setLastResetDate] = useState('');
+          
           const [currentTask, setCurrentTask] = useState('');
           const [taskStartCycle, setTaskStartCycle] = useState(1);
+          const [targetCycles, setTargetCycles] = useState(2); // Défaut 2 cycles (1 travail + 1 pause)
+          
           const [tasksInProgress, setTasksInProgress] = useState([]);
           const [completedTasks, setCompletedTasks] = useState([]);
           const [taskStats, setTaskStats] = useState({});
           const [activeTaskId, setActiveTaskId] = useState(null);
+
+          // GAME ETATS
+          const [lives, setLives] = useState(5); // Commence à 5
+          const [showGameOver, setShowGameOver] = useState(false);
           
           const intervalRef = useRef(null);
           const audioContextRef = useRef(null);
           const playerRef = useRef(null);
 
-          // Initialisation des données depuis localStorage
+          // --- INITIALISATION ---
           useEffect(() => {
             const history = JSON.parse(localStorage.getItem('pomodoroHistory') || '[]');
             const count = parseInt(localStorage.getItem('todayPomodoros') || '0');
@@ -103,6 +162,7 @@
             const tasks = JSON.parse(localStorage.getItem('completedTasks') || '[]');
             const stats = JSON.parse(localStorage.getItem('taskStats') || '{}');
             const inProgress = JSON.parse(localStorage.getItem('tasksInProgress') || '[]');
+            const savedLives = parseInt(localStorage.getItem('pomodoroLives'));
             
             setVideoHistory(history);
             setTodayPomodoros(count);
@@ -111,31 +171,39 @@
             setTaskStats(stats);
             setTasksInProgress(inProgress);
             
+            // Si pas de vies sauvegardées, on commence à 5
+            if (!isNaN(savedLives)) {
+                setLives(savedLives);
+                if (savedLives === 0) setShowGameOver(true);
+            } else {
+                setLives(5);
+            }
+            
             checkDailyReset();
           }, []);
 
-          // Gestion du lecteur YouTube
+          // --- TITRE DYNAMIQUE ONGLETS ---
+          useEffect(() => {
+            const mins = Math.floor(timeLeft / 60);
+            if (isRunning) {
+                document.title = `[${mins}'] Pomodoro`;
+            } else {
+                document.title = "Pomodoro Focus Timer";
+            }
+          }, [timeLeft, isRunning]);
+
+          // --- YOUTUBE ---
           useEffect(() => {
             if (videoId && window.YT && window.YT.Player) {
               if (playerRef.current) {
-                // On essaie de détruire proprement l'instance précédente si elle existe
                 try { playerRef.current.destroy(); } catch(e) {}
               }
-              
-              // Création du nouveau lecteur
               playerRef.current = new window.YT.Player('youtube-player', {
                 videoId: videoId,
-                playerVars: {
-                  autoplay: 0,
-                  controls: 1,
-                  // Important pour éviter l'erreur 153 : définir l'origine
-                  origin: window.location.origin 
-                },
+                playerVars: { autoplay: 0, controls: 1, origin: window.location.origin },
                 events: {
                   onReady: (event) => {
-                    if (isRunning) {
-                      event.target.playVideo();
-                    }
+                    if (isRunning) event.target.playVideo();
                   }
                 }
               });
@@ -146,7 +214,6 @@
             const now = new Date();
             const today = now.toDateString();
             const storedDate = localStorage.getItem('lastResetDate');
-            
             if (storedDate !== today) {
               const currentHour = now.getHours();
               if (currentHour >= 8) {
@@ -154,6 +221,7 @@
                 localStorage.setItem('todayPomodoros', '0');
                 localStorage.setItem('lastResetDate', today);
                 setLastResetDate(today);
+                // On ne reset pas les vies ici, c'est un jeu continu
               }
             }
           };
@@ -165,7 +233,6 @@
               setPlaylistId(playlistMatch[1]);
               return null;
             }
-            
             setIsPlaylist(false);
             const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
             const match = url.match(regExp);
@@ -175,23 +242,18 @@
           const loadVideo = () => {
             const id = extractVideoId(youtubeUrl);
             if (id || isPlaylist) {
-              if (id) {
-                setVideoId(id);
-              }
+              if (id) setVideoId(id);
               const newHistory = [{url: youtubeUrl, id: id || playlistId, isPlaylist}, ...videoHistory.filter(v => v.url !== youtubeUrl)].slice(0, 5);
               setVideoHistory(newHistory);
               localStorage.setItem('pomodoroHistory', JSON.stringify(newHistory));
             }
           };
 
-          const loadHistoryVideo = (historyItem) => {
-            setYoutubeUrl(historyItem.url);
-            setIsPlaylist(historyItem.isPlaylist);
-            if (historyItem.isPlaylist) {
-              setPlaylistId(historyItem.id);
-            } else {
-              setVideoId(historyItem.id);
-            }
+          const loadHistoryVideo = (item) => {
+            setYoutubeUrl(item.url);
+            setIsPlaylist(item.isPlaylist);
+            if (item.isPlaylist) setPlaylistId(item.id);
+            else setVideoId(item.id);
           };
 
           const deleteFromHistory = (index) => {
@@ -205,74 +267,54 @@
             localStorage.setItem('pomodoroHistory', '[]');
           };
 
-          // Logique du Timer
+          // --- TIMER LOGIC ---
           useEffect(() => {
             if (isRunning && timeLeft > 0) {
               intervalRef.current = setInterval(() => {
                 setTimeLeft(prev => {
-                  if (prev <= 10 && prev > 0) {
-                    playTickSound();
-                  }
-                  if (prev === 1) {
-                    handleCycleEnd();
-                  }
+                  if (prev <= 10 && prev > 0) playTickSound();
+                  if (prev === 1) handleCycleEnd();
                   return prev - 1;
                 });
               }, 1000);
             } else {
               clearInterval(intervalRef.current);
             }
-
             return () => clearInterval(intervalRef.current);
           }, [isRunning, timeLeft]);
 
           const playTickSound = () => {
-            if (!audioContextRef.current) {
-              audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            
+            if (!audioContextRef.current) audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
             const ctx = audioContextRef.current;
-            const oscillator = ctx.createOscillator();
-            const gainNode = ctx.createGain();
-            
-            oscillator.connect(gainNode);
-            gainNode.connect(ctx.destination);
-            
-            oscillator.frequency.value = 800;
-            oscillator.type = 'sine';
-            
-            gainNode.gain.setValueAtTime(0.1, ctx.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
-            
-            oscillator.start(ctx.currentTime);
-            oscillator.stop(ctx.currentTime + 0.1);
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.frequency.value = 800;
+            osc.type = 'sine';
+            gain.gain.setValueAtTime(0.1, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + 0.1);
           };
 
           const playBellSound = () => {
-            if (!audioContextRef.current) {
-              audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            
+            if (!audioContextRef.current) audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
             const ctx = audioContextRef.current;
-            const oscillator = ctx.createOscillator();
-            const gainNode = ctx.createGain();
-            
-            oscillator.connect(gainNode);
-            gainNode.connect(ctx.destination);
-            
-            oscillator.frequency.value = 400;
-            oscillator.type = 'sine';
-            
-            gainNode.gain.setValueAtTime(0.3, ctx.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 1.5);
-            
-            oscillator.start(ctx.currentTime);
-            oscillator.stop(ctx.currentTime + 1.5);
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.frequency.value = 400;
+            osc.type = 'sine';
+            gain.gain.setValueAtTime(0.3, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 1.5);
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + 1.5);
           };
 
           const handleCycleEnd = () => {
             playBellSound();
-
             if (currentCycle >= 8) {
               setIsRunning(false);
               setCurrentCycle(1);
@@ -280,16 +322,13 @@
               setTimeLeft(workTime * 60);
               return;
             }
-
             const nextCycle = currentCycle + 1;
             setCurrentCycle(nextCycle);
-            
             if (isWorkSession) {
               const newPomodoros = todayPomodoros + 1;
               setTodayPomodoros(newPomodoros);
               localStorage.setItem('todayPomodoros', newPomodoros.toString());
               checkDailyReset();
-              
               setIsWorkSession(false);
               const isLongBreak = nextCycle % 2 === 0 && (nextCycle / 2) % 4 === 0;
               const breakTime = isLongBreak ? longBreak : shortBreak;
@@ -298,31 +337,19 @@
               setIsWorkSession(true);
               setTimeLeft(workTime * 60);
             }
-            
-            // Redémarrage automatique après 1 seconde
             setTimeout(() => {
               setIsRunning(true);
-              if (playerRef.current && playerRef.current.playVideo) {
-                playerRef.current.playVideo();
-              }
+              if (playerRef.current && playerRef.current.playVideo) playerRef.current.playVideo();
             }, 1000);
           };
 
           const toggleTimer = () => {
             const newRunningState = !isRunning;
             setIsRunning(newRunningState);
-            
-            // Nécessaire pour activer l'audioContext sur certains navigateurs (Chrome/Safari)
-            if (newRunningState && !audioContextRef.current) {
-                 audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
-            }
-
+            if (newRunningState && !audioContextRef.current) audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
             if (playerRef.current) {
-              if (newRunningState && playerRef.current.playVideo) {
-                playerRef.current.playVideo();
-              } else if (!newRunningState && playerRef.current.pauseVideo) {
-                playerRef.current.pauseVideo();
-              }
+              if (newRunningState && playerRef.current.playVideo) playerRef.current.playVideo();
+              else if (!newRunningState && playerRef.current.pauseVideo) playerRef.current.pauseVideo();
             }
           };
 
@@ -332,9 +359,7 @@
             setIsWorkSession(true);
             setTimeLeft(workTime * 60);
             setActiveTaskId(null);
-            if (playerRef.current && playerRef.current.pauseVideo) {
-              playerRef.current.pauseVideo();
-            }
+            if (playerRef.current && playerRef.current.pauseVideo) playerRef.current.pauseVideo();
           };
 
           const resetTimer = () => {
@@ -342,9 +367,7 @@
             setCurrentCycle(1);
             setIsWorkSession(true);
             setTimeLeft(workTime * 60);
-            if (playerRef.current && playerRef.current.pauseVideo) {
-              playerRef.current.pauseVideo();
-            }
+            if (playerRef.current && playerRef.current.pauseVideo) playerRef.current.pauseVideo();
           };
 
           const formatTime = (seconds) => {
@@ -353,16 +376,38 @@
             return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
           };
 
+          // --- LOGIQUE TACHES ET VIES ---
+          
+          const handlePresetClick = (preset) => {
+              setCurrentTask(preset.name);
+              setTargetCycles(preset.duration);
+          };
+
+          const adjustTargetCycles = (amount) => {
+              setTargetCycles(prev => {
+                  const newVal = prev + amount;
+                  return newVal < 2 ? 2 : newVal;
+              });
+          };
+
+          const getTargetLabel = (cycles) => {
+              const tours = Math.floor(cycles / 8);
+              const rest = cycles % 8;
+              if (tours > 0) {
+                  return `${tours} Tour${tours > 1 ? 's' : ''} + ${rest} cycles`;
+              }
+              return `${rest} cycles`;
+          };
+
           const startTask = () => {
             if (!currentTask.trim()) return;
-            
             const newTask = {
               id: Date.now(),
               name: currentTask.trim(),
               startCycle: currentCycle,
+              targetCycles: targetCycles,
               startedAt: new Date().toISOString(),
             };
-            
             const newTasksInProgress = [...tasksInProgress, newTask];
             setTasksInProgress(newTasksInProgress);
             localStorage.setItem('tasksInProgress', JSON.stringify(newTasksInProgress));
@@ -370,16 +415,10 @@
             setActiveTaskId(newTask.id);
             setTaskStartCycle(currentCycle);
             setCurrentTask('');
-            
             setIsRunning(true);
-            // Activer l'audio context au clic
-            if (!audioContextRef.current) {
-                 audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
-            }
-
-            if (playerRef.current && playerRef.current.playVideo) {
-              playerRef.current.playVideo();
-            }
+            
+            if (!audioContextRef.current) audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+            if (playerRef.current && playerRef.current.playVideo) playerRef.current.playVideo();
           };
 
           const completeTask = (taskId) => {
@@ -388,26 +427,43 @@
             
             const cyclesSpent = currentCycle - task.startCycle + 1;
             
+            // --- LOGIQUE DE JEU ---
+            let newLives = lives;
+            if (cyclesSpent < task.targetCycles) {
+                // Gagné du temps : +1 vie
+                newLives = Math.min(lives + 1, 10);
+            } else if (cyclesSpent > task.targetCycles) {
+                // Perdu du temps : -1 vie
+                newLives = Math.max(lives - 1, 0);
+            }
+            
+            setLives(newLives);
+            localStorage.setItem('pomodoroLives', newLives);
+            
+            if (newLives === 0) {
+                setShowGameOver(true);
+                stopTimer(); // Arrête tout si game over
+            }
+
+            // Enregistrement de la tâche
             const completedTask = {
               ...task,
               cycles: cyclesSpent,
               completedAt: new Date().toISOString(),
             };
-            
             const newCompletedTasks = [completedTask, ...completedTasks];
             setCompletedTasks(newCompletedTasks);
             localStorage.setItem('completedTasks', JSON.stringify(newCompletedTasks));
             
+            // Stats
             const newStats = { ...taskStats };
-            if (!newStats[task.name]) {
-              newStats[task.name] = { totalCycles: 0, count: 0 };
-            }
+            if (!newStats[task.name]) newStats[task.name] = { totalCycles: 0, count: 0 };
             newStats[task.name].totalCycles += cyclesSpent;
             newStats[task.name].count += 1;
-            
             setTaskStats(newStats);
             localStorage.setItem('taskStats', JSON.stringify(newStats));
             
+            // Cleanup en cours
             const newTasksInProgress = tasksInProgress.filter(t => t.id !== taskId);
             setTasksInProgress(newTasksInProgress);
             localStorage.setItem('tasksInProgress', JSON.stringify(newTasksInProgress));
@@ -415,23 +471,21 @@
             if (activeTaskId === taskId) {
               setActiveTaskId(null);
               setIsRunning(false);
-              if (playerRef.current && playerRef.current.pauseVideo) {
-                playerRef.current.pauseVideo();
-              }
+              if (playerRef.current && playerRef.current.pauseVideo) playerRef.current.pauseVideo();
             }
           };
 
           const moveToInProgress = (taskId) => {
             const task = completedTasks.find(t => t.id === taskId);
             if (!task) return;
-            
+            // On reprend avec l'objectif initial
             const restoredTask = {
               id: Date.now(),
               name: task.name,
               startCycle: currentCycle,
+              targetCycles: task.targetCycles || 2, // fallback
               startedAt: new Date().toISOString(),
             };
-            
             const newTasksInProgress = [...tasksInProgress, restoredTask];
             setTasksInProgress(newTasksInProgress);
             localStorage.setItem('tasksInProgress', JSON.stringify(newTasksInProgress));
@@ -441,6 +495,25 @@
             localStorage.setItem('completedTasks', JSON.stringify(newCompletedTasks));
           };
 
+          const deleteCompletedTask = (taskId) => {
+             const newCompletedTasks = completedTasks.filter(t => t.id !== taskId);
+             setCompletedTasks(newCompletedTasks);
+             localStorage.setItem('completedTasks', JSON.stringify(newCompletedTasks));
+          };
+
+          const clearAllCompletedTasks = () => {
+             if (confirm("Voulez-vous vraiment effacer tout l'historique des tâches terminées ?")) {
+                 setCompletedTasks([]);
+                 localStorage.setItem('completedTasks', '[]');
+             }
+          };
+
+          const restartGame = () => {
+              setLives(5); // Reset à 5 vies
+              localStorage.setItem('pomodoroLives', 5);
+              setShowGameOver(false);
+          };
+
           const getAverageTime = (taskName) => {
             if (!taskStats[taskName]) return 0;
             const avg = taskStats[taskName].totalCycles / taskStats[taskName].count;
@@ -448,25 +521,73 @@
           };
 
           const formatCycles = (cycles) => {
-            const hours = Math.floor(cycles * workTime / 60);
-            const mins = (cycles * workTime) % 60;
-            if (hours > 0) {
-              return `${hours}h${mins > 0 ? ` ${mins}min` : ''}`;
-            }
-            return `${mins}min`;
+            // Affichage simplifié
+            const tours = Math.floor(cycles / 8);
+            const rest = cycles % 8;
+            if (tours > 0) return `${tours}T ${rest}c`;
+            return `${rest}c`;
           };
 
           const currentRound = Math.ceil(currentCycle / 2);
 
           return (
-            <div className="max-w-7xl mx-auto">
-              <h1 className="text-5xl font-bold mb-12 text-center text-[#151515]">
-                Pomodoro Focus Timer
-              </h1>
+            <div className="max-w-7xl mx-auto relative">
+              
+              {/* HEADER AVEC VIES */}
+              <div className="flex flex-col md:flex-row justify-between items-center mb-8">
+                  <h1 className="text-4xl font-bold text-[#151515] mb-4 md:mb-0">
+                    Pomodoro Focus Timer
+                  </h1>
+                  
+                  {/* COMPTEUR DE VIES ZELDA */}
+                  <div className="bg-white p-3 rounded-2xl border-2 border-[#151515] flex gap-1 shadow-sm">
+                      {[...Array(10)].map((_, i) => (
+                          <div key={i} className="heart-icon">
+                              {i < lives ? <FullHeart /> : <EmptyHeart />}
+                          </div>
+                      ))}
+                  </div>
+              </div>
+
+              {/* GAME OVER POPUP */}
+              {showGameOver && (
+                  <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+                      <div className="bg-white p-8 rounded-3xl border-4 border-red-500 max-w-lg w-full text-center modal-animate shadow-2xl">
+                          <h2 className="text-5xl font-bold text-red-600 mb-6 font-poppins tracking-wider">GAME OVER</h2>
+                          <p className="text-xl text-[#151515] mb-8 font-normal">
+                              Recommence, tu dois encore t'améliorer sur ta gestion du temps
+                          </p>
+                          <button 
+                              onClick={restartGame}
+                              className="px-8 py-4 bg-[#151515] text-white text-lg font-bold rounded-2xl hover:bg-[#333] transition border-2 border-[#151515]"
+                          >
+                              Recommencer
+                          </button>
+                      </div>
+                  </div>
+              )}
+
+              {/* BARRE DE STATS HORIZONTALE */}
+              {Object.keys(taskStats).length > 0 && (
+                <div className="mb-8 w-full overflow-x-auto hide-scrollbar">
+                    <div className="flex gap-4 min-w-max pb-2">
+                        {Object.entries(taskStats).map(([taskName, stats]) => (
+                            <div key={taskName} className="bg-[#FEFAF5] p-4 rounded-2xl border-2 border-[#151515] w-48 flex-shrink-0 flex flex-col justify-center items-center text-center">
+                                <div className="font-bold text-[#151515] truncate w-full mb-1" title={taskName}>{taskName}</div>
+                                <div className="text-sm text-slate-600">
+                                    Moy. : {formatCycles(getAverageTime(taskName))}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* COLONNE GAUCHE */}
+                
+                {/* --- COLONNE GAUCHE --- */}
                 <div className="space-y-6">
+                  
                   {/* Carte Vidéo */}
                   <div className="bg-[#FEFAF5] p-8 rounded-3xl border-2 border-[#151515]">
                     <h2 className="text-2xl font-semibold mb-6 text-[#151515]">Vidéo d'ambiance</h2>
@@ -475,91 +596,56 @@
                         type="text"
                         value={youtubeUrl}
                         onChange={(e) => setYoutubeUrl(e.target.value)}
-                        placeholder="URL YouTube (vidéo ou playlist)"
+                        placeholder="URL YouTube"
                         className="flex-1 px-5 py-3 bg-white border-2 border-[#151515] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#151515] text-[#151515]"
                       />
-                      <button
-                        onClick={loadVideo}
-                        className="px-8 py-3 bg-[#151515] hover:bg-[#2a2a2a] text-white rounded-2xl font-medium transition"
-                      >
+                      <button onClick={loadVideo} className="px-6 py-3 bg-[#151515] hover:bg-[#2a2a2a] text-white rounded-2xl font-medium transition">
                         Charger
                       </button>
                     </div>
                     <div className="aspect-video bg-slate-900 rounded-2xl overflow-hidden border-2 border-[#151515]">
                       {videoId || isPlaylist ? (
                         isPlaylist ? (
-                          <iframe
-                            className="w-full h-full"
-                            src={`https://www.youtube.com/embed/videoseries?list=${playlistId}&autoplay=0&controls=1&origin=${window.location.origin}`}
-                            title="YouTube playlist player"
-                            frameBorder="0"
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                            allowFullScreen
-                          ></iframe>
+                          <iframe className="w-full h-full" src={`https://www.youtube.com/embed/videoseries?list=${playlistId}&autoplay=0&controls=1&origin=${window.location.origin}`} allowFullScreen></iframe>
                         ) : (
                           <div id="youtube-player" className="w-full h-full"></div>
                         )
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-slate-400">
-                          Entrez une URL YouTube pour commencer
-                        </div>
+                        <div className="w-full h-full flex items-center justify-center text-slate-400">Entrez une URL YouTube</div>
                       )}
                     </div>
                   </div>
 
-                  {/* Historique Vidéo */}
-                  {videoHistory.length > 0 && (
-                    <div className="bg-[#FEFAF5] p-8 rounded-3xl border-2 border-[#151515]">
-                      <div className="flex justify-between items-center mb-6">
-                        <h3 className="text-xl font-semibold text-[#151515]">Historique des vidéos</h3>
-                        <button
-                          onClick={clearHistory}
-                          className="text-sm px-4 py-2 bg-[#F2994A] text-[#FEFAF5] hover:bg-[#e08936] border-2 border-[#FEFAF5] rounded-xl transition"
-                        >
-                          Vider
-                        </button>
-                      </div>
-                      <div className="space-y-3">
-                        {videoHistory.map((item, idx) => (
-                          <div key={idx} className="flex items-center gap-3">
-                            <button
-                              onClick={() => loadHistoryVideo(item)}
-                              className="flex-1 text-left px-5 py-3 bg-white hover:bg-slate-50 border-2 border-[#151515] rounded-2xl transition text-sm truncate text-[#151515]"
-                            >
-                              {item.url}
-                            </button>
-                            <button
-                              onClick={() => deleteFromHistory(idx)}
-                              className="px-4 py-3 bg-[#F2994A] hover:bg-[#e08936] text-[#FEFAF5] border-2 border-[#FEFAF5] rounded-2xl transition flex items-center justify-center"
-                            >
-                              <div className="cross-icon"></div>
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
                   {/* Historique Tâches */}
                   {completedTasks.length > 0 && (
                     <div className="bg-[#FEFAF5] p-8 rounded-3xl border-2 border-[#151515]">
-                      <h2 className="text-2xl font-semibold mb-6 text-[#151515]">Historique des tâches</h2>
-                      <div className="space-y-3 max-h-80 overflow-y-auto">
-                        {completedTasks.slice(0, 10).map((task) => (
+                      <div className="flex justify-between items-center mb-6">
+                         <h2 className="text-2xl font-semibold text-[#151515]">Historique</h2>
+                         <button onClick={clearAllCompletedTasks} className="text-sm px-3 py-2 bg-red-500 hover:bg-red-600 text-white border-2 border-[#FEFAF5] rounded-xl transition font-medium">
+                            Tout effacer
+                         </button>
+                      </div>
+                      <div className="space-y-3 max-h-80 overflow-y-auto pr-2">
+                        {completedTasks.slice(0, 15).map((task) => (
                           <div key={task.id} className="bg-white p-4 rounded-2xl border-2 border-[#151515]">
                             <div className="flex justify-between items-start">
                               <div className="flex-1">
                                 <div className="font-medium text-[#151515]">{task.name}</div>
                                 <div className="text-slate-600 text-xs mt-1">
-                                  {formatCycles(task.cycles)} • {new Date(task.completedAt).toLocaleString('fr-FR')}
+                                  Réalisé: {formatCycles(task.cycles)} / Visé: {formatCycles(task.targetCycles || 0)}
+                                </div>
+                                <div className={`text-xs mt-1 font-bold ${task.cycles < task.targetCycles ? 'text-green-600' : task.cycles > task.targetCycles ? 'text-red-500' : 'text-slate-500'}`}>
+                                    {task.cycles < task.targetCycles ? '+1 Vie' : task.cycles > task.targetCycles ? '-1 Vie' : 'Neutre'}
                                 </div>
                               </div>
-                              <button
-                                onClick={() => moveToInProgress(task.id)}
-                                className="px-3 py-2 bg-[#F2994A] text-[#FEFAF5] hover:bg-[#e08936] border-2 border-[#FEFAF5] rounded-xl text-xs transition ml-3"
-                              >
-                                Reprendre
-                              </button>
+                              <div className="flex gap-2">
+                                <button onClick={() => moveToInProgress(task.id)} className="px-3 py-2 bg-[#F2994A] text-[#FEFAF5] border-2 border-[#FEFAF5] rounded-xl text-xs transition">
+                                    Reprendre
+                                </button>
+                                <button onClick={() => deleteCompletedTask(task.id)} className="px-3 py-2 bg-white text-slate-400 hover:text-red-500 border-2 border-slate-200 hover:border-red-500 rounded-xl text-xs">
+                                    <div className="cross-icon"></div>
+                                </button>
+                              </div>
                             </div>
                           </div>
                         ))}
@@ -568,9 +654,9 @@
                   )}
                 </div>
 
-                {/* COLONNE DROITE */}
+                {/* --- COLONNE DROITE --- */}
                 <div className="space-y-6">
-                  {/* Timer Principal */}
+                  {/* Timer */}
                   <div className="bg-[#FEFAF5] p-10 rounded-3xl border-2 border-[#151515] text-center">
                     <div className="mb-6">
                       <span className="text-sm font-medium text-slate-600">
@@ -581,122 +667,94 @@
                       {formatTime(timeLeft)}
                     </div>
                     <div className="flex justify-center gap-4 mb-8">
-                      <button
-                        onClick={toggleTimer}
-                        className={`p-5 border-2 rounded-2xl transition flex items-center justify-center ${
-                          isRunning 
-                            ? 'bg-[#F2994A] border-[#FEFAF5] text-[#FEFAF5] hover:bg-[#e08936]' 
-                            : 'bg-[#FEFAF5] border-[#151515] text-[#151515] hover:bg-slate-50'
-                        }`}
-                      >
-                        {isRunning ? (
-                          <div className="pause-icon">
-                            <div className="pause-bar"></div>
-                            <div className="pause-bar"></div>
-                          </div>
-                        ) : (
-                          <div className="play-icon"></div>
-                        )}
+                      <button onClick={toggleTimer} className={`p-5 border-2 rounded-2xl transition flex items-center justify-center ${isRunning ? 'bg-[#F2994A] border-[#FEFAF5] text-[#FEFAF5]' : 'bg-[#FEFAF5] border-[#151515] text-[#151515]'}`}>
+                        {isRunning ? <div className="pause-icon"><div className="pause-bar"></div><div className="pause-bar"></div></div> : <div className="play-icon"></div>}
                       </button>
-                      <button
-                        onClick={stopTimer}
-                        className="p-5 bg-[#F2994A] border-2 border-[#FEFAF5] hover:bg-[#e08936] text-[#FEFAF5] rounded-2xl transition flex items-center justify-center"
-                      >
-                        <div className="stop-icon"></div>
-                      </button>
-                      <button
-                        onClick={resetTimer}
-                        className="p-5 bg-[#F2994A] border-2 border-[#FEFAF5] hover:bg-[#e08936] text-[#FEFAF5] rounded-2xl transition flex items-center justify-center"
-                      >
-                        <div className="reset-icon"></div>
-                      </button>
-                    </div>
-                    <div className="text-xl font-semibold text-[#FEFAF5] bg-[#F2994A] py-4 px-6 rounded-2xl border-2 border-[#151515]">
-                      Aujourd'hui : {todayPomodoros} pomodoro{todayPomodoros > 1 ? 's' : ''}
+                      <button onClick={stopTimer} className="p-5 bg-[#F2994A] border-2 border-[#FEFAF5] text-[#FEFAF5] rounded-2xl"><div className="stop-icon"></div></button>
+                      <button onClick={resetTimer} className="p-5 bg-[#F2994A] border-2 border-[#FEFAF5] text-[#FEFAF5] rounded-2xl"><div className="reset-icon"></div></button>
                     </div>
                   </div>
 
-                  {/* Réglages */}
+                  {/* TUILES MARKETING (PRESETS) */}
                   <div className="bg-[#FEFAF5] p-8 rounded-3xl border-2 border-[#151515]">
-                    <h2 className="text-2xl font-semibold mb-6 text-[#151515]">Réglages</h2>
+                     <h2 className="text-2xl font-semibold mb-4 text-[#151515]">Tâches Rapides</h2>
+                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        {MARKETING_PRESETS.map((preset, idx) => (
+                            <button 
+                                key={idx}
+                                onClick={() => handlePresetClick(preset)}
+                                className="p-3 bg-white border-2 border-[#151515] rounded-xl hover:bg-slate-50 transition text-sm flex flex-col items-center justify-center h-24"
+                            >
+                                <span className="font-medium text-[#151515] mb-1">{preset.name}</span>
+                                <span className="text-xs text-slate-500">{formatCycles(preset.duration)}</span>
+                            </button>
+                        ))}
+                     </div>
+                  </div>
+
+                  {/* NOUVELLE TACHE & OBJECTIF */}
+                  <div className="bg-[#FEFAF5] p-8 rounded-3xl border-2 border-[#151515]">
+                    <h2 className="text-2xl font-semibold mb-6 text-[#151515]">Lancer une tâche</h2>
                     <div className="space-y-5">
-                      <div>
-                        <label className="block text-sm font-medium mb-2 text-[#151515]">Temps de travail (min)</label>
-                        <input
-                          type="number"
-                          value={workTime}
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value) || 0;
-                            setWorkTime(val);
-                            if (isWorkSession && !isRunning) setTimeLeft(val * 60);
-                          }}
-                          className="w-full px-5 py-3 bg-white border-2 border-[#151515] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#151515] text-[#151515]"
-                          min="1"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-2 text-[#151515]">Pause courte (min)</label>
-                        <input
-                          type="number"
-                          value={shortBreak}
-                          onChange={(e) => setShortBreak(parseInt(e.target.value) || 0)}
-                          className="w-full px-5 py-3 bg-white border-2 border-[#151515] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#151515] text-[#151515]"
-                          min="0"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-2 text-[#151515]">Pause longue (min)</label>
-                        <input
-                          type="number"
-                          value={longBreak}
-                          onChange={(e) => setLongBreak(parseInt(e.target.value) || 0)}
-                          className="w-full px-5 py-3 bg-white border-2 border-[#151515] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#151515] text-[#151515]"
-                          min="0"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Nouvelle Tâche */}
-                  <div className="bg-[#FEFAF5] p-8 rounded-3xl border-2 border-[#151515]">
-                    <h2 className="text-2xl font-semibold mb-6 text-[#151515]">Nouvelle tâche</h2>
-                    <div className="space-y-4">
                       <input
                         type="text"
                         value={currentTask}
                         onChange={(e) => setCurrentTask(e.target.value)}
                         onKeyPress={(e) => e.key === 'Enter' && startTask()}
-                        placeholder="Ex: Montage vidéo, Rédaction article..."
+                        placeholder="Nom de la tâche..."
                         className="w-full px-5 py-3 bg-white border-2 border-[#151515] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#151515] text-[#151515]"
                       />
+                      
+                      {/* SELECTEUR DE TEMPS VISE */}
+                      <div className="bg-white border-2 border-[#151515] rounded-2xl p-4 flex flex-col items-center">
+                          <label className="text-sm font-medium text-slate-500 mb-3">Temps visé</label>
+                          <div className="flex items-center gap-6 w-full justify-between px-4">
+                              <button 
+                                onClick={() => adjustTargetCycles(-2)}
+                                className="w-12 h-12 flex items-center justify-center border-2 border-[#151515] rounded-xl hover:bg-slate-50 transition"
+                              >
+                                  <div className="pause-bar w-4 h-1 rotate-90"></div>
+                              </button>
+                              
+                              <div className="text-center">
+                                  <div className="text-xl font-bold text-[#151515]">{getTargetLabel(targetCycles)}</div>
+                              </div>
+
+                              <button 
+                                onClick={() => adjustTargetCycles(2)}
+                                className="w-12 h-12 flex items-center justify-center border-2 border-[#151515] rounded-xl hover:bg-slate-50 transition relative"
+                              >
+                                  <div className="absolute w-4 h-1 bg-current rounded-sm"></div>
+                                  <div className="absolute w-1 h-4 bg-current rounded-sm"></div>
+                              </button>
+                          </div>
+                      </div>
+
                       <button
                         onClick={startTask}
                         disabled={!currentTask.trim()}
                         className="w-full px-5 py-4 bg-[#151515] hover:bg-[#2a2a2a] text-white disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed rounded-2xl font-medium transition border-2 border-[#151515]"
                       >
-                        Lancer la tâche
+                        Lancer le chrono
                       </button>
                     </div>
                   </div>
 
-                  {/* Tâches en cours */}
+                  {/* TACHES EN COURS */}
                   {tasksInProgress.length > 0 && (
                     <div className="bg-[#FEFAF5] p-8 rounded-3xl border-2 border-[#151515]">
-                      <h2 className="text-2xl font-semibold mb-6 text-[#151515]">Tâches en cours</h2>
+                      <h2 className="text-2xl font-semibold mb-6 text-[#151515]">En cours</h2>
                       <div className="space-y-3">
                         {tasksInProgress.map((task) => (
                           <div key={task.id} className={`p-5 rounded-2xl border-2 ${activeTaskId === task.id ? 'bg-blue-50 border-blue-500' : 'bg-white border-[#151515]'}`}>
                             <div className="flex justify-between items-start mb-2">
                               <div className="font-medium flex-1 text-[#151515]">{task.name}</div>
-                              <button
-                                onClick={() => completeTask(task.id)}
-                                className="px-4 py-2 bg-[#F2994A] hover:bg-[#e08936] text-[#FEFAF5] border-2 border-[#FEFAF5] rounded-xl text-sm transition ml-3"
-                              >
-                                ✓ Terminée
+                              <button onClick={() => completeTask(task.id)} className="px-4 py-2 bg-[#F2994A] hover:bg-[#e08936] text-[#FEFAF5] border-2 border-[#FEFAF5] rounded-xl text-sm transition ml-3">
+                                ✓ Fini
                               </button>
                             </div>
                             <div className="text-xs text-slate-600 font-medium">
-                              Cycles : {currentCycle - task.startCycle + 1}
+                              Temps: {formatCycles(currentCycle - task.startCycle + 1)} / Visé: {formatCycles(task.targetCycles)}
                             </div>
                           </div>
                         ))}
@@ -704,32 +762,12 @@
                     </div>
                   )}
 
-                  {/* Statistiques */}
-                  {Object.keys(taskStats).length > 0 && (
-                    <div className="bg-[#FEFAF5] p-8 rounded-3xl border-2 border-[#151515]">
-                      <h2 className="text-2xl font-semibold mb-6 text-[#151515]">Statistiques par activité</h2>
-                      <div className="space-y-3">
-                        {Object.entries(taskStats).map(([taskName, stats]) => (
-                          <div key={taskName} className="bg-white p-5 rounded-2xl border-2 border-[#151515]">
-                            <div className="font-medium mb-2 text-[#151515]">{taskName}</div>
-                            <div className="text-sm text-slate-700">
-                              Temps moyen : {formatCycles(getAverageTime(taskName))} ({getAverageTime(taskName)} cycle{getAverageTime(taskName) > 1 ? 's' : ''})
-                            </div>
-                            <div className="text-xs text-slate-600 mt-1">
-                              {stats.count} tâche{stats.count > 1 ? 's' : ''} terminée{stats.count > 1 ? 's' : ''}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
           );
         }
 
-        // Rendu React 18 correct
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<PomodoroTimer />);
     </script>
