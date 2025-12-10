@@ -458,9 +458,14 @@
                           {BADGES_DEF.map((badge) => {
                               const unlocked = badges.includes(badge.id);
                               return (
-                                  <div key={badge.id} className={`flex flex-col items-center text-center p-2 rounded-xl transition ${unlocked ? 'bg-white border-2 border-yellow-400 trophy-unlocked' : 'opacity-50 trophy-locked'}`} title={badge.desc}>
+                                  <div key={badge.id} className={`group relative flex flex-col items-center text-center p-2 rounded-xl transition cursor-help ${unlocked ? 'bg-white border-2 border-yellow-400 trophy-unlocked' : 'opacity-50 trophy-locked'}`}>
                                       <div className="text-3xl mb-1">{badge.icon}</div>
                                       <div className="text-[10px] font-bold leading-tight">{badge.name}</div>
+                                      {/* TOOLTIP */}
+                                      <div className="absolute bottom-full mb-2 w-32 p-2 bg-[#151515] text-white text-[10px] rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-20 pointer-events-none shadow-xl">
+                                          {badge.desc}
+                                          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#151515]"></div>
+                                      </div>
                                   </div>
                               );
                           })}
