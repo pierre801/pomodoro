@@ -36,6 +36,13 @@
         .trophy-locked { filter: grayscale(100%); opacity: 0.4; }
         .trophy-unlocked { filter: none; opacity: 1; transform: scale(1); transition: transform 0.2s; }
         .trophy-unlocked:hover { transform: scale(1.1); }
+        
+        @keyframes pulse-green {
+            0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+            70% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        }
+        .active-dot { animation: pulse-green 2s infinite; }
     </style>
 </head>
 <body class="min-h-screen bg-[#FBDEC4] text-slate-800 p-4 md:p-8">
@@ -88,11 +95,11 @@
           const [isPlaylist, setIsPlaylist] = useState(false);
           const [playlistId, setPlaylistId] = useState('');
           
-          const [workTime, setWorkTime] = useState(30);
-          const [shortBreak, setShortBreak] = useState(0);
-          const [longBreak, setLongBreak] = useState(20);
-          const [timeLeft, setTimeLeft] = useState(30 * 60);
-          const [totalTimeForCurrentSession, setTotalTimeForCurrentSession] = useState(30 * 60);
+          const [workTime, setWorkTime] = useState(25);
+          const [shortBreak, setShortBreak] = useState(5);
+          const [longBreak, setLongBreak] = useState(15);
+          const [timeLeft, setTimeLeft] = useState(25 * 60);
+          const [totalTimeForCurrentSession, setTotalTimeForCurrentSession] = useState(25 * 60);
           
           const [isRunning, setIsRunning] = useState(false);
           const [currentCycle, setCurrentCycle] = useState(1);
@@ -240,44 +247,22 @@
             osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 1.5);
           };
 
-          // --- LOGIQUE AUTOMATIQUE DE CYCLE (FIX) ---
           const handleCycleEnd = () => {
             playBellSound();
-            
-            // Calcul du prochain cycle (1 à 8)
             let nextCycle = currentCycle + 1;
-            
-            // Si on vient de finir le cycle 8 (Pause Longue), on repart à 1
-            if (currentCycle >= 8) {
-                nextCycle = 1;
-            }
-            
+            if (currentCycle >= 8) { nextCycle = 1; }
             setCurrentCycle(nextCycle);
-
-            // LOGIQUE IMPLACABLE : Impair = Travail, Pair = Pause
-            // 1=T, 2=PC, 3=T, 4=PC, 5=T, 6=PC, 7=T, 8=PL
             const isNextSessionWork = (nextCycle % 2 !== 0);
             setIsWorkSession(isNextSessionWork);
-
-            // Calculer la durée suivante
             let nextDuration = 0;
             if (isNextSessionWork) {
-                // C'est un cycle de travail
                 nextDuration = workTime * 60;
                 sendNotification("Au travail", "Concentration maximale !");
-                
-                // --- Fin de la session précédente (qui était une pause) ---
-                // Rien de spécial à faire, on démarre le travail
             } else {
-                // C'est une pause (Courte ou Longue)
-                // Donc on VIENT de finir une session de travail
                 const newPomodoros = todayPomodoros + 1;
                 setTodayPomodoros(newPomodoros);
                 localStorage.setItem('todayPomodoros', newPomodoros.toString());
-                
-                addXp(100); // 100 XP par cycle de travail fini
-                
-                // Streak Logic
+                addXp(100); 
                 const today = new Date().toDateString();
                 const lastStreakDate = localStorage.getItem('lastStreakUpdateDate');
                 if (lastStreakDate !== today) {
@@ -285,31 +270,24 @@
                     localStorage.setItem('pomodoroStreak', newStreak.toString());
                     localStorage.setItem('lastStreakUpdateDate', today);
                 }
-                
                 checkBadges();
                 checkDailyReset();
-
-                if (nextCycle === 8) {
-                    nextDuration = longBreak * 60;
-                    sendNotification("Pause Longue", "On souffle, fin du tour !");
-                } else {
-                    nextDuration = shortBreak * 60;
-                    sendNotification("Pause Courte", "Petite pause café.");
-                }
+                if (nextCycle === 8) { nextDuration = longBreak * 60; sendNotification("Pause Longue", "On souffle, fin du tour !"); }
+                else { nextDuration = shortBreak * 60; sendNotification("Pause Courte", "Petite pause café."); }
             }
-
-            // Application immédiate des temps et CONTINUATION
             setTimeLeft(nextDuration);
             setTotalTimeForCurrentSession(nextDuration);
-            
-            // On s'assure que ça continue de tourner
             setIsRunning(true);
-            
-            // Si une vidéo est chargée, on la relance (ou on la laisse tourner)
             if (playerRef.current && playerRef.current.playVideo) playerRef.current.playVideo();
           };
 
           const toggleTimer = () => {
+            // SECURITE: Obliger de choisir une tâche
+            if (!activeTaskId && !isRunning) {
+                alert("⚠️ Veuillez sélectionner une tâche dans la liste 'En cours' ou en créer une nouvelle pour démarrer le chrono !");
+                return;
+            }
+            
             const newRunningState = !isRunning; setIsRunning(newRunningState);
             if (newRunningState && !audioContextRef.current) audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
             if (playerRef.current) { if (newRunningState && playerRef.current.playVideo) playerRef.current.playVideo(); else if (!newRunningState && playerRef.current.pauseVideo) playerRef.current.pauseVideo(); }
@@ -344,13 +322,26 @@
             if (!currentTask.trim()) return;
             const newTask = { id: Date.now(), name: currentTask.trim(), startCycle: currentCycle, targetCycles: targetCycles, startedAt: new Date().toISOString() };
             setTasksInProgress([...tasksInProgress, newTask]); localStorage.setItem('tasksInProgress', JSON.stringify([...tasksInProgress, newTask]));
-            setActiveTaskId(newTask.id); setTaskStartCycle(currentCycle); setCurrentTask(''); setIsRunning(true);
+            
+            // Activation auto au démarrage
+            setActiveTaskId(newTask.id); 
+            setTaskStartCycle(currentCycle); 
+            setCurrentTask(''); 
+            setIsRunning(true);
             setTotalTimeForCurrentSession(workTime * 60);
             if (!audioContextRef.current) audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
             if (playerRef.current && playerRef.current.playVideo) playerRef.current.playVideo();
           };
 
-          const completeTask = (taskId) => {
+          const activateTask = (taskId) => {
+              setActiveTaskId(taskId);
+              setTaskStartCycle(currentCycle);
+              // Optionnel: on peut lancer le timer automatiquement quand on clique sur une tâche
+              // setIsRunning(true); 
+          };
+
+          const completeTask = (taskId, e) => {
+            e.stopPropagation(); // Evite de déclencher le clic de la carte
             const task = tasksInProgress.find(t => t.id === taskId); if (!task) return;
             const cyclesSpent = currentCycle - task.startCycle + 1;
             addXp(50 * cyclesSpent); 
@@ -440,7 +431,84 @@
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                
+                {/* --- COLONNE GAUCHE (Maintenant: TIMER + SETTINGS + NEW TASK + SUCCESS) --- */}
                 <div className="space-y-6">
+                  
+                  {/* TIMER */}
+                  <div className="bg-[#FEFAF5] p-10 rounded-3xl border-2 border-[#151515] text-center relative overflow-visible">
+                    <div className="mb-4"><span className="text-sm font-medium text-slate-600">{isWorkSession ? 'Session de travail' : 'Pause'} • Cycle {currentCycle}/8</span></div>
+                    <div className="relative w-64 h-64 mx-auto mb-10 flex items-center justify-center">
+                        <ProgressRing radius={120} stroke={8} progress={progressPercentage} />
+                        <div className="text-6xl font-bold text-[#151515] z-10">{formatTime(timeLeft)}</div>
+                    </div>
+                    <div className="flex justify-center gap-4 mb-8">
+                      <button onClick={toggleTimer} className={`w-24 p-5 border-2 rounded-2xl transition flex items-center justify-center ${!activeTaskId && !isRunning ? 'bg-slate-200 text-slate-400 cursor-not-allowed border-slate-300' : isRunning ? 'bg-[#F2994A] border-[#FEFAF5] text-[#FEFAF5]' : 'bg-[#FEFAF5] border-[#151515] text-[#151515]'}`}>
+                        {isRunning ? <div className="pause-icon"><div className="pause-bar"></div><div className="pause-bar"></div></div> : <div className="play-icon"></div>}
+                      </button>
+                      <button onClick={stopTimer} className="w-24 p-5 bg-[#F2994A] border-2 border-[#FEFAF5] text-[#FEFAF5] rounded-2xl flex items-center justify-center"><div className="stop-icon"></div></button>
+                      <button onClick={resetTimer} className="w-24 p-5 bg-[#F2994A] border-2 border-[#FEFAF5] text-[#FEFAF5] rounded-2xl flex items-center justify-center"><div className="reset-icon"></div></button>
+                    </div>
+                    <div className="text-lg font-semibold text-[#FEFAF5] bg-[#F2994A] py-3 px-6 rounded-2xl border-2 border-[#151515]">
+                      Aujourd'hui : {todayPomodoros} pomodoro{todayPomodoros > 1 ? 's' : ''} ({Math.floor(todayMinutes / 60)}h {todayMinutes % 60}m)
+                    </div>
+                  </div>
+                  
+                  {/* REGLAGES */}
+                  <div className="bg-[#FEFAF5] p-8 rounded-3xl border-2 border-[#151515]">
+                    <h2 className="text-xl font-semibold mb-4 text-[#151515]">Réglages</h2>
+                    <div className="grid grid-cols-3 gap-3 mb-6">
+                        <div><label className="block text-xs font-medium mb-1 text-slate-500">Travail</label><input type="number" value={workTime} onChange={(e) => { let v = Math.max(0, Math.min(60, parseInt(e.target.value)||0)); setWorkTime(v); if (isWorkSession && !isRunning) { setTimeLeft(v*60); setTotalTimeForCurrentSession(v*60); }}} className="w-full px-2 py-2 bg-white border-2 border-[#151515] rounded-xl text-center" min="0" max="60"/></div>
+                        <div><label className="block text-xs font-medium mb-1 text-slate-500">P. Courte</label><input type="number" value={shortBreak} onChange={(e) => setShortBreak(Math.max(0, Math.min(60, parseInt(e.target.value)||0)))} className="w-full px-2 py-2 bg-white border-2 border-[#151515] rounded-xl text-center" min="0" max="60"/></div>
+                        <div><label className="block text-xs font-medium mb-1 text-slate-500">P. Longue</label><input type="number" value={longBreak} onChange={(e) => setLongBreak(Math.max(0, Math.min(60, parseInt(e.target.value)||0)))} className="w-full px-2 py-2 bg-white border-2 border-[#151515] rounded-xl text-center" min="0" max="60"/></div>
+                    </div>
+                    <div><label className="block text-xs font-medium mb-1 text-slate-500">Volume ({Math.round(volume * 100)}%)</label><input type="range" min="0" max="1" step="0.1" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} className="w-full accent-[#151515] h-2 bg-white rounded-lg appearance-none cursor-pointer border border-[#151515]"/></div>
+                  </div>
+
+                  {/* NEW TASK */}
+                  <div className="bg-[#FEFAF5] p-8 rounded-3xl border-2 border-[#151515]">
+                    <h2 className="text-xl font-semibold mb-4 text-[#151515]">Nouvelle tâche</h2>
+                    <div className="space-y-4">
+                      <input type="text" value={currentTask} onChange={(e) => setCurrentTask(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && startTask()} placeholder="Nom de la tâche..." className="w-full px-4 py-3 bg-white border-2 border-[#151515] rounded-2xl focus:outline-none" />
+                      <div className="bg-white border-2 border-[#151515] rounded-2xl p-3 flex flex-col items-center">
+                          <label className="text-xs font-medium text-slate-500 mb-2">Objectif (Temps visé)</label>
+                          <div className="flex items-center gap-4 w-full justify-between px-2">
+                              <button onClick={() => adjustTargetCycles(-2)} className="w-10 h-10 flex items-center justify-center border-2 border-[#151515] rounded-xl hover:bg-slate-50"><div className="w-3 h-1 bg-current rounded-sm"></div></button>
+                              <div className="text-lg font-bold text-[#151515]">{getTargetLabel(targetCycles)}</div>
+                              <button onClick={() => adjustTargetCycles(2)} className="w-10 h-10 flex items-center justify-center border-2 border-[#151515] rounded-xl hover:bg-slate-50 relative"><div className="absolute w-3 h-1 bg-current rounded-sm"></div><div className="absolute w-1 h-3 bg-current rounded-sm"></div></button>
+                          </div>
+                      </div>
+                      <button onClick={startTask} disabled={!currentTask.trim()} className="w-full px-5 py-3 bg-[#151515] hover:bg-[#2a2a2a] text-white disabled:bg-slate-300 disabled:cursor-not-allowed rounded-2xl font-medium transition border-2 border-[#151515]">GO !</button>
+                    </div>
+                  </div>
+
+                  {/* SUCCES (BADGES) - MOVED HERE */}
+                  <div className="bg-[#FEFAF5] p-8 rounded-3xl border-2 border-[#151515]">
+                      <h2 className="text-xl font-semibold mb-4 text-[#151515]">Succès</h2>
+                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
+                          {BADGES_DEF.map((badge) => {
+                              const unlocked = badges.includes(badge.id);
+                              return (
+                                  <div key={badge.id} className={`group relative flex flex-col items-center text-center p-2 rounded-xl transition cursor-help ${unlocked ? 'bg-white border-2 border-yellow-400 trophy-unlocked' : 'opacity-50 trophy-locked'}`}>
+                                      <div className="text-3xl mb-1">{badge.icon}</div>
+                                      <div className="text-[10px] font-bold leading-tight">{badge.name}</div>
+                                      {/* TOOLTIP */}
+                                      <div className="absolute bottom-full mb-2 w-32 p-2 bg-[#151515] text-white text-[10px] rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-20 pointer-events-none shadow-xl">
+                                          {badge.desc}
+                                          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#151515]"></div>
+                                      </div>
+                                  </div>
+                              );
+                          })}
+                      </div>
+                  </div>
+
+                </div>
+
+                {/* --- COLONNE DROITE (Maintenant: VIDEO + EN COURS + HISTORIQUE + STATS) --- */}
+                <div className="space-y-6">
+                  
+                  {/* VIDEO */}
                   <div className="bg-[#FEFAF5] p-8 rounded-3xl border-2 border-[#151515]">
                     <h2 className="text-xl font-semibold mb-4 text-[#151515]">Ambiance</h2>
                     <div className="flex gap-3 mb-4">
@@ -452,7 +520,48 @@
                     </div>
                   </div>
 
-                  {/* RESTORED VIDEO HISTORY */}
+                  {/* EN COURS (Moved here) */}
+                  {tasksInProgress.length > 0 && (
+                    <div className="bg-[#FEFAF5] p-8 rounded-3xl border-2 border-[#151515]">
+                      <h2 className="text-xl font-semibold mb-4 text-[#151515]">En cours</h2>
+                      <div className="space-y-3">
+                        {tasksInProgress.map((task, index) => {
+                          const isActive = activeTaskId === task.id;
+                          return (
+                            <div 
+                                key={task.id} 
+                                draggable 
+                                onDragStart={() => (dragItem.current = index)} 
+                                onDragEnter={() => (dragOverItem.current = index)} 
+                                onDragEnd={handleSort} 
+                                onDragOver={(e) => e.preventDefault()} 
+                                onClick={() => activateTask(task.id)}
+                                className={`p-4 rounded-2xl border-2 card-draggable transition-all cursor-pointer relative group
+                                    ${isActive 
+                                        ? 'bg-blue-50 border-blue-500 shadow-md scale-[1.02]' 
+                                        : 'bg-white border-[#151515] hover:border-blue-300 hover:bg-slate-50'
+                                    }`}
+                            >
+                                {isActive && (
+                                    <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-green-500 active-dot border-2 border-white"></div>
+                                )}
+                                <div className="flex justify-between items-start mb-2 pl-3">
+                                  <div className={`font-medium flex-1 flex items-center ${isActive ? 'text-blue-700' : 'text-[#151515]'}`}>
+                                      <GripHandle />
+                                      {task.name}
+                                      {isActive && <span className="ml-2 text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-bold">ACTIVE</span>}
+                                  </div>
+                                  <button onClick={(e) => completeTask(task.id, e)} className="px-3 py-1 bg-[#F2994A] hover:bg-[#e08936] text-[#FEFAF5] border-2 border-[#FEFAF5] rounded-xl text-xs transition ml-2 z-10 relative">Fini</button>
+                                </div>
+                                <div className="text-xs text-slate-600 font-medium pl-9">Temps: {formatCycles(currentCycle - task.startCycle + 1)} / Visé: {formatCycles(task.targetCycles)}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* VIDEO HISTORY */}
                   {videoHistory.length > 0 && (
                     <div className="bg-[#FEFAF5] p-8 rounded-3xl border-2 border-[#151515]">
                       <div className="flex justify-between items-center mb-6">
@@ -485,26 +594,7 @@
                     </div>
                   )}
 
-                  <div className="bg-[#FEFAF5] p-8 rounded-3xl border-2 border-[#151515]">
-                      <h2 className="text-xl font-semibold mb-4 text-[#151515]">Succès</h2>
-                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
-                          {BADGES_DEF.map((badge) => {
-                              const unlocked = badges.includes(badge.id);
-                              return (
-                                  <div key={badge.id} className={`group relative flex flex-col items-center text-center p-2 rounded-xl transition cursor-help ${unlocked ? 'bg-white border-2 border-yellow-400 trophy-unlocked' : 'opacity-50 trophy-locked'}`}>
-                                      <div className="text-3xl mb-1">{badge.icon}</div>
-                                      <div className="text-[10px] font-bold leading-tight">{badge.name}</div>
-                                      {/* TOOLTIP */}
-                                      <div className="absolute bottom-full mb-2 w-32 p-2 bg-[#151515] text-white text-[10px] rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-20 pointer-events-none shadow-xl">
-                                          {badge.desc}
-                                          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#151515]"></div>
-                                      </div>
-                                  </div>
-                              );
-                          })}
-                      </div>
-                  </div>
-
+                  {/* STATS */}
                   {Object.keys(taskStats).length > 0 && (
                     <div className="bg-[#FEFAF5] p-8 rounded-3xl border-2 border-[#151515]">
                         <h2 className="text-xl font-semibold mb-4 text-[#151515]">Statistiques</h2>
@@ -522,10 +612,11 @@
                     </div>
                   )}
                   
+                  {/* HISTORIQUE TACHES */}
                   {completedTasks.length > 0 && (
                     <div className="bg-[#FEFAF5] p-8 rounded-3xl border-2 border-[#151515]">
                       <div className="flex justify-between items-center mb-4">
-                         <h2 className="text-xl font-semibold text-[#151515]">Historique</h2>
+                         <h2 className="text-xl font-semibold text-[#151515]">Historique des tâches</h2>
                          <button onClick={clearAllCompletedTasks} className="text-xs px-2 py-1 bg-red-100 text-red-600 border border-red-200 rounded hover:bg-red-200">Effacer</button>
                       </div>
                       <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
@@ -544,69 +635,6 @@
                                     {task.cycles < task.targetCycles ? '+1 Vie' : task.cycles > task.targetCycles ? '-1 Vie' : 'Neutre'}
                                 </span>
                             </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-6">
-                  <div className="bg-[#FEFAF5] p-10 rounded-3xl border-2 border-[#151515] text-center relative overflow-visible">
-                    <div className="mb-4"><span className="text-sm font-medium text-slate-600">{isWorkSession ? 'Session de travail' : 'Pause'} • Cycle {currentCycle}/8</span></div>
-                    <div className="relative w-64 h-64 mx-auto mb-10 flex items-center justify-center">
-                        <ProgressRing radius={120} stroke={8} progress={progressPercentage} />
-                        <div className="text-6xl font-bold text-[#151515] z-10">{formatTime(timeLeft)}</div>
-                    </div>
-                    <div className="flex justify-center gap-4 mb-8">
-                      <button onClick={toggleTimer} className={`w-24 p-5 border-2 rounded-2xl transition flex items-center justify-center ${isRunning ? 'bg-[#F2994A] border-[#FEFAF5] text-[#FEFAF5]' : 'bg-[#FEFAF5] border-[#151515] text-[#151515]'}`}>
-                        {isRunning ? <div className="pause-icon"><div className="pause-bar"></div><div className="pause-bar"></div></div> : <div className="play-icon"></div>}
-                      </button>
-                      <button onClick={stopTimer} className="w-24 p-5 bg-[#F2994A] border-2 border-[#FEFAF5] text-[#FEFAF5] rounded-2xl flex items-center justify-center"><div className="stop-icon"></div></button>
-                      <button onClick={resetTimer} className="w-24 p-5 bg-[#F2994A] border-2 border-[#FEFAF5] text-[#FEFAF5] rounded-2xl flex items-center justify-center"><div className="reset-icon"></div></button>
-                    </div>
-                    <div className="text-lg font-semibold text-[#FEFAF5] bg-[#F2994A] py-3 px-6 rounded-2xl border-2 border-[#151515]">
-                      Aujourd'hui : {todayPomodoros} pomodoro{todayPomodoros > 1 ? 's' : ''} ({Math.floor(todayMinutes / 60)}h {todayMinutes % 60}m)
-                    </div>
-                  </div>
-                  
-                  <div className="bg-[#FEFAF5] p-8 rounded-3xl border-2 border-[#151515]">
-                    <h2 className="text-xl font-semibold mb-4 text-[#151515]">Réglages</h2>
-                    <div className="grid grid-cols-3 gap-3 mb-6">
-                        <div><label className="block text-xs font-medium mb-1 text-slate-500">Travail</label><input type="number" value={workTime} onChange={(e) => { let v = Math.max(0, Math.min(60, parseInt(e.target.value)||0)); setWorkTime(v); if (isWorkSession && !isRunning) { setTimeLeft(v*60); setTotalTimeForCurrentSession(v*60); }}} className="w-full px-2 py-2 bg-white border-2 border-[#151515] rounded-xl text-center" min="0" max="60"/></div>
-                        <div><label className="block text-xs font-medium mb-1 text-slate-500">Pause Courte</label><input type="number" value={shortBreak} onChange={(e) => setShortBreak(Math.max(0, Math.min(60, parseInt(e.target.value)||0)))} className="w-full px-2 py-2 bg-white border-2 border-[#151515] rounded-xl text-center" min="0" max="60"/></div>
-                        <div><label className="block text-xs font-medium mb-1 text-slate-500">Pause Longue</label><input type="number" value={longBreak} onChange={(e) => setLongBreak(Math.max(0, Math.min(60, parseInt(e.target.value)||0)))} className="w-full px-2 py-2 bg-white border-2 border-[#151515] rounded-xl text-center" min="0" max="60"/></div>
-                    </div>
-                    <div><label className="block text-xs font-medium mb-1 text-slate-500">Volume ({Math.round(volume * 100)}%)</label><input type="range" min="0" max="1" step="0.1" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} className="w-full accent-[#151515] h-2 bg-white rounded-lg appearance-none cursor-pointer border border-[#151515]"/></div>
-                  </div>
-
-                  <div className="bg-[#FEFAF5] p-8 rounded-3xl border-2 border-[#151515]">
-                    <h2 className="text-xl font-semibold mb-4 text-[#151515]">Nouvelle tâche</h2>
-                    <div className="space-y-4">
-                      <input type="text" value={currentTask} onChange={(e) => setCurrentTask(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && startTask()} placeholder="Nom de la tâche..." className="w-full px-4 py-3 bg-white border-2 border-[#151515] rounded-2xl focus:outline-none" />
-                      <div className="bg-white border-2 border-[#151515] rounded-2xl p-3 flex flex-col items-center">
-                          <label className="text-xs font-medium text-slate-500 mb-2">Objectif (Temps visé)</label>
-                          <div className="flex items-center gap-4 w-full justify-between px-2">
-                              <button onClick={() => adjustTargetCycles(-2)} className="w-10 h-10 flex items-center justify-center border-2 border-[#151515] rounded-xl hover:bg-slate-50"><div className="w-3 h-1 bg-current rounded-sm"></div></button>
-                              <div className="text-lg font-bold text-[#151515]">{getTargetLabel(targetCycles)}</div>
-                              <button onClick={() => adjustTargetCycles(2)} className="w-10 h-10 flex items-center justify-center border-2 border-[#151515] rounded-xl hover:bg-slate-50 relative"><div className="absolute w-3 h-1 bg-current rounded-sm"></div><div className="absolute w-1 h-3 bg-current rounded-sm"></div></button>
-                          </div>
-                      </div>
-                      <button onClick={startTask} disabled={!currentTask.trim()} className="w-full px-5 py-3 bg-[#151515] hover:bg-[#2a2a2a] text-white disabled:bg-slate-300 disabled:cursor-not-allowed rounded-2xl font-medium transition border-2 border-[#151515]">GO !</button>
-                    </div>
-                  </div>
-
-                  {tasksInProgress.length > 0 && (
-                    <div className="bg-[#FEFAF5] p-8 rounded-3xl border-2 border-[#151515]">
-                      <h2 className="text-xl font-semibold mb-4 text-[#151515]">En cours</h2>
-                      <div className="space-y-3">
-                        {tasksInProgress.map((task, index) => (
-                          <div key={task.id} draggable onDragStart={() => (dragItem.current = index)} onDragEnter={() => (dragOverItem.current = index)} onDragEnd={handleSort} onDragOver={(e) => e.preventDefault()} className={`p-4 rounded-2xl border-2 card-draggable transition-transform active:scale-95 ${activeTaskId === task.id ? 'bg-blue-50 border-blue-500' : 'bg-white border-[#151515]'}`}>
-                            <div className="flex justify-between items-start mb-2">
-                              <div className="font-medium flex-1 text-[#151515] flex items-center"><GripHandle />{task.name}</div>
-                              <button onClick={() => completeTask(task.id)} className="px-3 py-1 bg-[#F2994A] hover:bg-[#e08936] text-[#FEFAF5] border-2 border-[#FEFAF5] rounded-xl text-xs transition ml-2">Fini</button>
-                            </div>
-                            <div className="text-xs text-slate-600 font-medium pl-6">Temps: {formatCycles(currentCycle - task.startCycle + 1)} / Visé: {formatCycles(task.targetCycles)}</div>
                           </div>
                         ))}
                       </div>
