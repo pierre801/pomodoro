@@ -117,7 +117,6 @@
           const [todayPomodoros, setTodayPomodoros] = useState(0);
           const [lastResetDate, setLastResetDate] = useState('');
           const [currentTask, setCurrentTask] = useState('');
-          const [taskStartCycle, setTaskStartCycle] = useState(1);
           const [targetCycles, setTargetCycles] = useState(2); 
           const [tasksInProgress, setTasksInProgress] = useState([]);
           const [completedTasks, setCompletedTasks] = useState([]);
@@ -218,7 +217,7 @@
             }
           };
 
-          // --- CORE TIMER LOGIC FIXED ---
+          // --- CORE TIMER LOGIC ---
           useEffect(() => {
             let interval = null;
             if (isRunning && timeLeft > 0) {
@@ -230,7 +229,6 @@
                 });
               }, 1000);
             } else if (timeLeft === 0 && isRunning) {
-               // Auto-switch when time reaches 0
                handleCycleEnd();
             }
             return () => clearInterval(interval);
@@ -280,11 +278,24 @@
                 nextDuration = workTime * 60;
                 sendNotification("Au travail", "Concentration maximale !");
             } else {
+                // --- FIN SESSION TRAVAIL -> PAUSE ---
                 const newPomodoros = todayPomodoros + 1;
                 setTodayPomodoros(newPomodoros);
                 localStorage.setItem('todayPomodoros', newPomodoros.toString());
                 addXp(100); 
                 
+                // MISE A JOUR DU TEMPS DE LA TACHE ACTIVE
+                if (activeTaskId) {
+                    const updatedTasks = tasksInProgress.map(t => {
+                        if (t.id === activeTaskId) {
+                            return { ...t, spentCycles: (t.spentCycles || 0) + 1 };
+                        }
+                        return t;
+                    });
+                    setTasksInProgress(updatedTasks);
+                    localStorage.setItem('tasksInProgress', JSON.stringify(updatedTasks));
+                }
+
                 const today = new Date().toDateString();
                 const lastStreakDate = localStorage.getItem('lastStreakUpdateDate');
                 if (lastStreakDate !== today) {
@@ -299,22 +310,18 @@
                 else { nextDuration = shortBreak * 60; sendNotification("Pause Courte", "Petite pause."); }
             }
             
-            // IMPORTANT: Set time directly without stopping
             if (nextDuration > 0) {
                 setTimeLeft(nextDuration);
                 setTotalTimeForCurrentSession(nextDuration);
             } else {
-                // Safety catch if duration is 0
                 setIsRunning(false);
             }
-            
-            // Ensure video keeps playing or restarts
             if (playerRef.current && playerRef.current.playVideo) playerRef.current.playVideo();
           };
 
           const toggleTimer = () => {
             if (!activeTaskId && !isRunning) { alert("⚠️ Sélectionnez une tâche pour commencer !"); return; }
-            initAudio(); // Wake up audio context
+            initAudio(); 
             const newRunningState = !isRunning; setIsRunning(newRunningState);
             if (playerRef.current) { if (newRunningState && playerRef.current.playVideo) playerRef.current.playVideo(); else if (!newRunningState && playerRef.current.pauseVideo) playerRef.current.pauseVideo(); }
           };
@@ -346,21 +353,22 @@
           
           const startTask = () => {
             if (!currentTask.trim()) return;
-            initAudio(); // Wake up audio context
-            const newTask = { id: Date.now(), name: currentTask.trim(), startCycle: currentCycle, targetCycles: targetCycles, startedAt: new Date().toISOString() };
+            initAudio(); 
+            // Initialize spentCycles to 0
+            const newTask = { id: Date.now(), name: currentTask.trim(), spentCycles: 0, targetCycles: targetCycles, startedAt: new Date().toISOString() };
             setTasksInProgress([...tasksInProgress, newTask]); localStorage.setItem('tasksInProgress', JSON.stringify([...tasksInProgress, newTask]));
-            setActiveTaskId(newTask.id); setTaskStartCycle(currentCycle); setCurrentTask(''); setIsRunning(true);
-            setTotalTimeForCurrentSession(workTime * 60);
+            setActiveTaskId(newTask.id); setCurrentCycle(1); setIsWorkSession(true); setCurrentTask(''); setIsRunning(true);
+            setTotalTimeForCurrentSession(workTime * 60); setTimeLeft(workTime * 60);
             if (playerRef.current && playerRef.current.playVideo) playerRef.current.playVideo();
           };
 
-          const activateTask = (taskId) => { setActiveTaskId(taskId); setTaskStartCycle(currentCycle); };
+          const activateTask = (taskId) => { setActiveTaskId(taskId); };
 
           const completeTask = (taskId, e) => {
             e.stopPropagation();
             const task = tasksInProgress.find(t => t.id === taskId); if (!task) return;
-            const cyclesSpent = currentCycle - task.startCycle + 1;
-            addXp(50 * cyclesSpent); 
+            const cyclesSpent = task.spentCycles || 0; // Use accumulated cycles
+            addXp(50 * Math.max(1, cyclesSpent)); // Min 50 XP
             let newLives = lives;
             if (cyclesSpent < task.targetCycles) newLives = Math.min(lives + 1, 10);
             else if (cyclesSpent > task.targetCycles) newLives = Math.max(lives - 1, 0);
@@ -390,7 +398,7 @@
 
           const moveToInProgress = (taskId) => {
             const task = completedTasks.find(t => t.id === taskId); if (!task) return;
-            const restoredTask = { id: Date.now(), name: task.name, startCycle: currentCycle, targetCycles: task.targetCycles || 2, startedAt: new Date().toISOString() };
+            const restoredTask = { id: Date.now(), name: task.name, spentCycles: 0, targetCycles: task.targetCycles || 2, startedAt: new Date().toISOString() };
             setTasksInProgress([...tasksInProgress, restoredTask]); localStorage.setItem('tasksInProgress', JSON.stringify([...tasksInProgress, restoredTask]));
             const newCompleted = completedTasks.filter(t => t.id !== taskId); setCompletedTasks(newCompleted); localStorage.setItem('completedTasks', JSON.stringify(newCompleted));
           };
@@ -503,10 +511,18 @@
                             <div key={task.id} draggable onDragStart={() => (dragItem.current = index)} onDragEnter={() => (dragOverItem.current = index)} onDragEnd={handleSort} onDragOver={(e) => e.preventDefault()} onClick={() => activateTask(task.id)} className={`p-4 rounded-2xl border-2 card-draggable transition-all cursor-pointer relative group ${isActive ? 'scale-[1.02]' : 'hover:opacity-80'}`} style={activeCardStyle}>
                                 {isActive && <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full active-dot border-2 border-white" style={{backgroundColor: theme.accent}}></div>}
                                 <div className="flex justify-between items-start mb-2 pl-3">
-                                  <div className="font-medium flex-1 flex items-center" style={{color: isActive ? theme.secondary : theme.text}}><GripHandle />{task.name}{isActive && <span className="ml-2 text-xs px-2 py-0.5 rounded-full font-bold" style={{backgroundColor: theme.secondary, color: '#fff'}}>ACTIVE</span>}</div>
+                                  <div className="font-medium flex-1 flex items-center" style={{color: isActive ? theme.secondary : theme.text}}>
+                                      <GripHandle />
+                                      {task.name}
+                                      {isActive && <span className="ml-2 text-xs px-2 py-0.5 rounded-full font-bold" style={{backgroundColor: theme.secondary, color: '#fff'}}>ACTIVE</span>}
+                                  </div>
                                   <button onClick={(e) => completeTask(task.id, e)} className="px-3 py-1 border-2 rounded-xl text-xs transition ml-2 z-10 relative hover:opacity-90" style={secondaryBtnStyle}>Fini</button>
                                 </div>
-                                <div className="text-xs font-medium pl-9 opacity-70">Temps: {formatCycles(currentCycle - task.startCycle + 1)} / Visé: {formatCycles(task.targetCycles)}</div>
+                                <div className="text-xs font-medium pl-9 opacity-70">
+                                    <span>Temps: {formatCycles(task.spentCycles || 0)}</span>
+                                    {isActive && isWorkSession && isRunning && <span className="ml-1 text-xs opacity-60 animate-pulse">(+1 en cours...)</span>}
+                                    <span className="ml-1">/ Visé: {formatCycles(task.targetCycles)}</span>
+                                </div>
                             </div>
                           );
                         })}
