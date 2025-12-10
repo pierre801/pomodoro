@@ -3,15 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pomodoro Focus Timer</title>
+    <title>Pomodoro</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { margin: 0; padding: 0; font-family: 'Poppins', sans-serif; transition: background-color 0.3s, color 0.3s; }
+        body { margin: 0; padding: 0; font-family: 'Poppins', sans-serif; transition: background-color 0.5s ease, color 0.5s ease; }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* Transition douce pour tous les éléments de couleur */
+        div, button, input, span, svg { transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, fill 0.3s ease, stroke 0.3s ease; }
+
         .play-icon { width: 0; height: 0; border-left: 14px solid currentColor; border-top: 8px solid transparent; border-bottom: 8px solid transparent; margin-left: 2px; }
         .pause-icon { display: flex; gap: 3px; }
         .pause-bar { width: 4px; height: 16px; background-color: currentColor; border-radius: 1px; }
@@ -25,11 +29,11 @@
         .trash-icon::before { content: ''; position: absolute; top: -4px; left: -2px; width: 18px; height: 2px; background-color: currentColor; }
         .trash-icon::after { content: ''; position: absolute; top: -6px; left: 4px; width: 6px; height: 2px; border: 2px solid currentColor; border-bottom: none; border-radius: 2px 2px 0 0; }
         .grip-icon { display: flex; flex-direction: column; gap: 2px; justify-content: center; align-items: center; width: 10px; cursor: move; }
-        .grip-dot { width: 4px; height: 4px; background-color: #cbd5e1; border-radius: 50%; }
+        .grip-dot { width: 4px; height: 4px; background-color: currentColor; opacity: 0.3; border-radius: 50%; }
         .card-draggable:active { cursor: grabbing; }
         .heart-icon { width: 24px; height: 24px; display: inline-block; }
-        .heart-fill { fill: #EF4444; }
-        .heart-empty { fill: #E5E7EB; stroke: #EF4444; stroke-width: 2; }
+        .heart-fill { fill: currentColor; } /* Utilise la couleur courante (Primary/Secondary) */
+        .heart-empty { fill: transparent; stroke: currentColor; stroke-width: 2; }
         @keyframes popIn { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
         .modal-animate { animation: popIn 0.3s ease-out forwards; }
         .progress-ring__circle { transition: stroke-dashoffset 0.35s; transform: rotate(-90deg); transform-origin: 50% 50%; }
@@ -37,15 +41,15 @@
         .trophy-unlocked { filter: none; opacity: 1; transform: scale(1); transition: transform 0.2s; }
         .trophy-unlocked:hover { transform: scale(1.1); }
         
-        @keyframes pulse-green {
-            0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
-            70% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        @keyframes pulse-active {
+            0% { box-shadow: 0 0 0 0 rgba(var(--pulse-color), 0.7); }
+            70% { box-shadow: 0 0 0 6px rgba(var(--pulse-color), 0); }
+            100% { box-shadow: 0 0 0 0 rgba(var(--pulse-color), 0); }
         }
-        .active-dot { animation: pulse-green 2s infinite; }
+        .active-dot { animation: pulse-active 2s infinite; }
     </style>
 </head>
-<body class="min-h-screen bg-[#FBDEC4] text-slate-800 p-4 md:p-8">
+<body class="min-h-screen p-4 md:p-8 transition-colors duration-500">
     <div id="root"></div>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -53,6 +57,146 @@
     <script src="https://www.youtube.com/iframe_api"></script>
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
+
+        // --- DEFINITION DES THEMES ---
+        const THEMES = {
+            pharow: {
+                name: "Original",
+                day: {
+                    bg: "#FBDEC4",
+                    card: "#FEFAF5",
+                    text: "#151515",
+                    primary: "#F2994A",
+                    secondary: "#151515",
+                    accent: "#22C55E",
+                    border: "#151515"
+                },
+                night: {
+                    bg: "#2C1810",
+                    card: "#432818",
+                    text: "#FBDEC4",
+                    primary: "#F2994A",
+                    secondary: "#FBDEC4",
+                    accent: "#22C55E",
+                    border: "#6B4226"
+                }
+            },
+            pokemon: {
+                name: "Dresseur",
+                day: {
+                    bg: "#F0F9FF", // Bleu très pâle
+                    card: "#FFFFFF",
+                    text: "#1E3A8A", // Bleu foncé
+                    primary: "#FFCB05", // Jaune Pikachu (Boutons)
+                    secondary: "#3B82F6", // Bleu (Détails)
+                    accent: "#EF4444", // Rouge (Vies/Alerte)
+                    border: "#BFDBFE" // Bordure bleu clair
+                },
+                night: {
+                    bg: "#172554", // Bleu nuit profond
+                    card: "#1E3A8A",
+                    text: "#FEF08A", // Texte jaune pâle
+                    primary: "#FFCB05", 
+                    secondary: "#60A5FA",
+                    accent: "#EF4444",
+                    border: "#2563EB"
+                }
+            },
+            onepiece: {
+                name: "Grand Line",
+                day: {
+                    bg: "#E0F2FE", // Ciel
+                    card: "#FFFFFF",
+                    text: "#0C4A6E", // Bleu encre
+                    primary: "#B91C1C", // Rouge Vermillon (Sang/Luffy)
+                    secondary: "#0284C7", // Bleu Océan
+                    accent: "#FBBF24", // Or/Trésor
+                    border: "#7DD3FC"
+                },
+                night: {
+                    bg: "#020617", // Abysses
+                    card: "#0F172A",
+                    text: "#E2E8F0",
+                    primary: "#DC2626", // Rouge vif
+                    secondary: "#38BDF8", // Cyan
+                    accent: "#FBBF24",
+                    border: "#1E293B"
+                }
+            },
+            lotr: {
+                name: "Terre du Milieu",
+                day: {
+                    bg: "#E3D5CA", // Beige parchemin foncé
+                    card: "#F5EBE0", // Beige clair
+                    text: "#4A3B32", // Brun terre
+                    primary: "#9A7D0A", // Or ancien
+                    secondary: "#3F6212", // Vert Comté
+                    accent: "#B45309", // Orange feu
+                    border: "#A89F91"
+                },
+                night: {
+                    bg: "#271C19", // Brun très sombre (Mordor)
+                    card: "#45322E", // Cuir sombre
+                    text: "#E7D5C0", // Texte parchemin
+                    primary: "#CA8A04", // Or qui brille
+                    secondary: "#65A30D", // Vert mousse sombre
+                    accent: "#F59E0B",
+                    border: "#785C4D"
+                }
+            },
+            zelda: {
+                name: "Hyrule",
+                day: {
+                    bg: "#ECFCCB", // Vert mousse
+                    card: "#FEFCE8", 
+                    text: "#14532D", // Vert très foncé
+                    primary: "#15803D", // Vert Link
+                    secondary: "#CA8A04", // Or Triforce
+                    accent: "#0EA5E9", // Bleu Esprit
+                    border: "#84CC16"
+                },
+                night: {
+                    bg: "#022C22", // Forêt profonde
+                    card: "#064E3B",
+                    text: "#D9F99D", // Vert spectral
+                    primary: "#22C55E", // Vert fluo
+                    secondary: "#EAB308",
+                    accent: "#38BDF8",
+                    border: "#14532D"
+                }
+            },
+            cyberpunk: {
+                name: "Night City",
+                // Mode Jour forcé en mode nuit pour Cyberpunk
+                day: {
+                    bg: "#09090B", card: "#18181B", text: "#22D3EE", primary: "#F472B6", secondary: "#FACC15", accent: "#22D3EE", border: "#27272A"
+                },
+                night: {
+                    bg: "#09090B", card: "#18181B", text: "#22D3EE", primary: "#F472B6", secondary: "#FACC15", accent: "#22D3EE", border: "#27272A"
+                }
+            },
+            pastel: {
+                name: "Douceur",
+                day: {
+                    bg: "#FDF2F8", // Rose très pâle
+                    card: "#FFFFFF",
+                    text: "#4B5563", // Gris doux
+                    primary: "#F472B6", // Rose bonbon
+                    secondary: "#A78BFA", // Lavande
+                    accent: "#34D399", // Menthe
+                    border: "#FBCFE8"
+                },
+                night: {
+                    bg: "#374151", // Gris ardoise
+                    card: "#4B5563",
+                    text: "#F3F4F6",
+                    primary: "#F472B6",
+                    secondary: "#A78BFA",
+                    accent: "#34D399",
+                    border: "#6B7280"
+                }
+            }
+        };
 
         const MARKETING_PRESETS = [
             { name: "Publications semaine", duration: 12, label: "3h" },
@@ -72,18 +216,20 @@
             { id: 'MASTER', icon: '👑', name: 'Maître du temps', desc: 'Atteindre le niveau 10' },
         ];
 
-        const FullHeart = () => <svg viewBox="0 0 24 24" className="w-6 h-6 text-red-500 fill-current"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>;
-        const EmptyHeart = () => <svg viewBox="0 0 24 24" className="w-6 h-6 text-red-500 fill-transparent stroke-current stroke-2"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>;
+        // UI Components
+        const FullHeart = ({ color }) => <svg viewBox="0 0 24 24" className="w-6 h-6 fill-current" style={{color: color}}><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>;
+        const EmptyHeart = ({ color }) => <svg viewBox="0 0 24 24" className="w-6 h-6 fill-transparent stroke-current stroke-2" style={{color: color}}><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>;
         const GripHandle = () => <div className="grip-icon mr-3"><div className="flex gap-[2px]"><div className="grip-dot"></div><div className="grip-dot"></div></div><div className="flex gap-[2px]"><div className="grip-dot"></div><div className="grip-dot"></div></div><div className="flex gap-[2px]"><div className="grip-dot"></div><div className="grip-dot"></div></div></div>;
-        const ProgressRing = ({ radius, stroke, progress }) => {
+        
+        const ProgressRing = ({ radius, stroke, progress, color, trackColor }) => {
             const normalizedRadius = radius - stroke * 2;
             const circumference = normalizedRadius * 2 * Math.PI;
             const strokeDashoffset = circumference - (progress / 100) * circumference;
             return (
                 <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none">
                     <svg height={radius * 2} width={radius * 2}>
-                        <circle stroke="#e5e7eb" strokeWidth={stroke} fill="transparent" r={normalizedRadius} cx={radius} cy={radius} />
-                        <circle className="progress-ring__circle" stroke="#151515" strokeWidth={stroke} strokeDasharray={circumference + ' ' + circumference} style={{ strokeDashoffset }} strokeLinecap="round" fill="transparent" r={normalizedRadius} cx={radius} cy={radius} />
+                        <circle stroke={trackColor} strokeWidth={stroke} fill="transparent" r={normalizedRadius} cx={radius} cy={radius} />
+                        <circle className="progress-ring__circle" stroke={color} strokeWidth={stroke} strokeDasharray={circumference + ' ' + circumference} style={{ strokeDashoffset }} strokeLinecap="round" fill="transparent" r={normalizedRadius} cx={radius} cy={radius} />
                     </svg>
                 </div>
             );
@@ -95,11 +241,11 @@
           const [isPlaylist, setIsPlaylist] = useState(false);
           const [playlistId, setPlaylistId] = useState('');
           
-          const [workTime, setWorkTime] = useState(30);
-          const [shortBreak, setShortBreak] = useState(0);
-          const [longBreak, setLongBreak] = useState(20);
-          const [timeLeft, setTimeLeft] = useState(30 * 60);
-          const [totalTimeForCurrentSession, setTotalTimeForCurrentSession] = useState(30 * 60);
+          const [workTime, setWorkTime] = useState(25);
+          const [shortBreak, setShortBreak] = useState(5);
+          const [longBreak, setLongBreak] = useState(15);
+          const [timeLeft, setTimeLeft] = useState(25 * 60);
+          const [totalTimeForCurrentSession, setTotalTimeForCurrentSession] = useState(25 * 60);
           
           const [isRunning, setIsRunning] = useState(false);
           const [currentCycle, setCurrentCycle] = useState(1);
@@ -123,12 +269,24 @@
           const [streak, setStreak] = useState(0);
           const [badges, setBadges] = useState([]); 
           const [volume, setVolume] = useState(0.3); 
+
+          const [currentThemeKey, setCurrentThemeKey] = useState('pharow');
+          const [isDarkMode, setIsDarkMode] = useState(false);
           
           const intervalRef = useRef(null);
           const audioContextRef = useRef(null);
           const playerRef = useRef(null);
           const dragItem = useRef(null);
           const dragOverItem = useRef(null);
+
+          const theme = THEMES[currentThemeKey][isDarkMode ? 'night' : 'day'];
+
+          useEffect(() => {
+              document.body.style.backgroundColor = theme.bg;
+              document.body.style.color = theme.text;
+              const pulseRgb = theme.secondary.match(/\w\w/g).map(x => parseInt(x, 16)).join(', ');
+              document.documentElement.style.setProperty('--pulse-color', pulseRgb);
+          }, [theme]);
 
           useEffect(() => {
             const history = JSON.parse(localStorage.getItem('pomodoroHistory') || '[]');
@@ -141,7 +299,9 @@
             const savedXp = parseInt(localStorage.getItem('pomodoroXp') || '0');
             const savedStreak = parseInt(localStorage.getItem('pomodoroStreak') || '0');
             const savedBadges = JSON.parse(localStorage.getItem('pomodoroBadges') || '[]');
-            
+            const savedTheme = localStorage.getItem('pomodoroTheme') || 'pharow';
+            const savedMode = localStorage.getItem('pomodoroDarkMode') === 'true';
+
             setVideoHistory(history);
             setTodayPomodoros(count);
             setLastResetDate(date);
@@ -151,6 +311,8 @@
             setXp(savedXp);
             setStreak(savedStreak);
             setBadges(savedBadges);
+            setCurrentThemeKey(savedTheme);
+            setIsDarkMode(savedMode);
             
             if (!isNaN(savedLives)) {
                 setLives(savedLives);
@@ -161,6 +323,12 @@
             checkDailyReset();
             checkStreakValidity(date, savedStreak);
           }, []);
+
+          const changeTheme = (key) => { setCurrentThemeKey(key); localStorage.setItem('pomodoroTheme', key); };
+          const toggleDarkMode = () => {
+              // Si Cyberpunk, on peut toggle mais visuellement ça change rien car day=night
+              const newMode = !isDarkMode; setIsDarkMode(newMode); localStorage.setItem('pomodoroDarkMode', newMode.toString());
+          };
 
           const checkStreakValidity = (lastDate, currentStreak) => {
               if (!lastDate) return;
@@ -381,28 +549,38 @@
           const currentRound = Math.ceil(currentCycle / 2);
           const progressPercentage = Math.min(100, Math.max(0, (timeLeft / totalTimeForCurrentSession) * 100));
 
+          // STYLES DYNAMIQUES
+          const cardStyle = { backgroundColor: theme.card, borderColor: theme.border, color: theme.text };
+          const primaryBtnStyle = { backgroundColor: theme.primary, color: '#FFFFFF', borderColor: theme.bg };
+          const primaryBtnTextBlack = { backgroundColor: theme.primary, color: '#151515', borderColor: theme.bg }; // Pour Pokemon
+          const secondaryBtnStyle = { backgroundColor: theme.secondary, color: '#FFFFFF', borderColor: theme.bg };
+          const inputStyle = { backgroundColor: isDarkMode ? theme.bg : '#FFFFFF', borderColor: theme.border, color: theme.text };
+
+          // Choix de style pour le bouton principal
+          const mainBtnStyle = currentThemeKey === 'pokemon' ? primaryBtnTextBlack : primaryBtnStyle;
+
           return (
-            <div className="max-w-7xl mx-auto relative pb-10">
+            <div className="max-w-7xl mx-auto relative pb-10 transition-colors duration-500">
               <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-                  <h1 className="text-3xl font-bold text-[#151515] text-center md:text-left">Pomodoro RPG</h1>
+                  <h1 className="text-3xl font-bold text-center md:text-left" style={{color: theme.text}}>Pomodoro Perso</h1>
                   <div className="flex flex-col items-end gap-2 w-full md:w-auto">
                       <div className="flex gap-3 justify-center md:justify-end w-full">
-                          <div className="bg-white px-3 py-2 rounded-xl border-2 border-[#151515] flex items-center gap-2 shadow-sm"><span className="text-xl">🔥</span><span className="font-bold text-[#151515]">{streak}</span></div>
-                          <div className="bg-white px-3 py-2 rounded-xl border-2 border-[#151515] flex gap-1 shadow-sm">{[...Array(10)].map((_, i) => <div key={i} className="heart-icon">{i < lives ? <FullHeart /> : <EmptyHeart />}</div>)}</div>
+                          <div className="px-3 py-2 rounded-xl border-2 flex items-center gap-2 shadow-sm" style={cardStyle}><span className="text-xl">🔥</span><span className="font-bold">{streak}</span></div>
+                          <div className="px-3 py-2 rounded-xl border-2 flex gap-1 shadow-sm" style={cardStyle}>{[...Array(10)].map((_, i) => <div key={i} className="heart-icon">{i < lives ? <FullHeart color={theme.primary} /> : <EmptyHeart color={theme.border} />}</div>)}</div>
                       </div>
-                      <div className="bg-white p-3 rounded-xl border-2 border-[#151515] w-full md:w-64 shadow-sm">
-                          <div className="flex justify-between items-end mb-1"><span className="font-bold text-sm text-[#151515]">Niveau {getLevel()}</span><span className="text-xs text-slate-500">{xp} XP</span></div>
-                          <div className="w-full bg-slate-100 rounded-full h-2.5 border border-slate-200"><div className="bg-[#F2994A] h-2.5 rounded-full transition-all duration-500" style={{ width: `${getXpProgress()}%` }}></div></div>
+                      <div className="p-3 rounded-xl border-2 w-full md:w-64 shadow-sm" style={cardStyle}>
+                          <div className="flex justify-between items-end mb-1"><span className="font-bold text-sm">Niveau {getLevel()}</span><span className="text-xs opacity-70">{xp} XP</span></div>
+                          <div className="w-full bg-slate-100 rounded-full h-2.5 border border-slate-200" style={{backgroundColor: theme.bg, borderColor: theme.border}}><div className="h-2.5 rounded-full transition-all duration-500" style={{ width: `${getXpProgress()}%`, backgroundColor: theme.accent }}></div></div>
                       </div>
                   </div>
               </div>
 
               {showGameOver && (
                   <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-                      <div className="bg-white p-8 rounded-3xl border-4 border-red-500 max-w-lg w-full text-center modal-animate shadow-2xl">
-                          <h2 className="text-5xl font-bold text-red-600 mb-6 tracking-wider">GAME OVER</h2>
-                          <p className="text-xl text-[#151515] mb-8">Recommence, tu dois encore t'améliorer sur ta gestion du temps</p>
-                          <button onClick={restartGame} className="px-8 py-4 bg-[#151515] text-white text-lg font-bold rounded-2xl hover:bg-[#333] transition border-2 border-[#151515]">Recommencer</button>
+                      <div className="p-8 rounded-3xl border-4 max-w-lg w-full text-center modal-animate shadow-2xl" style={{backgroundColor: theme.card, borderColor: theme.primary}}>
+                          <h2 className="text-5xl font-bold mb-6 tracking-wider" style={{color: theme.primary}}>GAME OVER</h2>
+                          <p className="text-xl mb-8" style={{color: theme.text}}>Recommence, tu dois encore t'améliorer sur ta gestion du temps</p>
+                          <button onClick={restartGame} className="px-8 py-4 text-white text-lg font-bold rounded-2xl hover:opacity-90 transition border-2" style={primaryBtnStyle}>Recommencer</button>
                       </div>
                   </div>
               )}
@@ -410,9 +588,9 @@
               <div className="mb-8 w-full overflow-x-auto hide-scrollbar">
                 <div className="flex gap-4 min-w-max pb-2">
                     {MARKETING_PRESETS.map((preset, idx) => (
-                        <button key={idx} onClick={() => handlePresetClick(preset)} className="bg-[#FEFAF5] hover:bg-white p-4 rounded-2xl border-2 border-[#151515] w-48 flex-shrink-0 flex flex-col justify-center items-center text-center transition">
-                            <span className="font-bold text-[#151515] mb-1 truncate w-full">{preset.name}</span>
-                            <span className="text-sm text-slate-500">{preset.label}</span>
+                        <button key={idx} onClick={() => handlePresetClick(preset)} className="hover:opacity-90 p-4 rounded-2xl border-2 w-48 flex-shrink-0 flex flex-col justify-center items-center text-center transition" style={cardStyle}>
+                            <span className="font-bold mb-1 truncate w-full">{preset.name}</span>
+                            <span className="text-sm opacity-70">{preset.label}</span>
                         </button>
                     ))}
                 </div>
@@ -420,33 +598,33 @@
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 
-                {/* --- COLONNE GAUCHE (VIDEO, HISTORY, TASKS, TASK HISTORY) --- */}
+                {/* --- COLONNE GAUCHE --- */}
                 <div className="space-y-6">
                   
                   {/* VIDEO PLAYER */}
-                  <div className="bg-[#FEFAF5] p-8 rounded-3xl border-2 border-[#151515]">
-                    <h2 className="text-xl font-semibold mb-4 text-[#151515]">Ambiance</h2>
+                  <div className="p-8 rounded-3xl border-2" style={cardStyle}>
+                    <h2 className="text-xl font-semibold mb-4">Ambiance</h2>
                     <div className="flex gap-3 mb-4">
-                      <input type="text" value={youtubeUrl} onChange={(e) => setYoutubeUrl(e.target.value)} placeholder="URL YouTube" className="flex-1 px-4 py-2 bg-white border-2 border-[#151515] rounded-xl focus:outline-none" />
-                      <button onClick={loadVideo} className="px-4 py-2 bg-[#151515] text-white rounded-xl text-sm font-medium">Charger</button>
+                      <input type="text" value={youtubeUrl} onChange={(e) => setYoutubeUrl(e.target.value)} placeholder="URL YouTube" className="flex-1 px-4 py-2 rounded-xl focus:outline-none border-2" style={inputStyle} />
+                      <button onClick={loadVideo} className="px-4 py-2 rounded-xl text-sm font-medium hover:opacity-90" style={mainBtnStyle}>Charger</button>
                     </div>
-                    <div className="aspect-video bg-slate-900 rounded-2xl overflow-hidden border-2 border-[#151515]">
+                    <div className="aspect-video bg-black rounded-2xl overflow-hidden border-2" style={{borderColor: theme.border}}>
                       {videoId || isPlaylist ? ( isPlaylist ? <iframe className="w-full h-full" src={`https://www.youtube.com/embed/videoseries?list=${playlistId}&autoplay=0&controls=1&origin=${window.location.origin}`} allowFullScreen></iframe> : <div id="youtube-player" className="w-full h-full"></div> ) : <div className="w-full h-full flex items-center justify-center text-slate-400 text-sm">Vidéo ici</div>}
                     </div>
                   </div>
 
-                  {/* VIDEO HISTORY (MOVED HERE UNDER PLAYER) */}
+                  {/* VIDEO HISTORY */}
                   {videoHistory.length > 0 && (
-                    <div className="bg-[#FEFAF5] p-8 rounded-3xl border-2 border-[#151515]">
+                    <div className="p-8 rounded-3xl border-2" style={cardStyle}>
                       <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-xl font-semibold text-[#151515]">Historique des vidéos</h2>
-                        <button onClick={clearHistory} className="text-sm px-4 py-2 bg-[#F2994A] text-[#FEFAF5] hover:bg-[#e08936] border-2 border-[#FEFAF5] rounded-xl transition">Vider</button>
+                        <h2 className="text-xl font-semibold">Historique Vidéos</h2>
+                        <button onClick={clearHistory} className="text-sm px-4 py-2 rounded-xl border-2 hover:opacity-90 transition" style={secondaryBtnStyle}>Vider</button>
                       </div>
                       <div className="space-y-3">
                         {videoHistory.map((item, idx) => (
                           <div key={idx} className="flex items-center gap-3">
-                            <button onClick={() => loadHistoryVideo(item)} className="flex-1 text-left px-5 py-3 bg-white hover:bg-slate-50 border-2 border-[#151515] rounded-2xl transition text-sm truncate text-[#151515]">{item.url}</button>
-                            <button onClick={() => deleteFromHistory(idx)} className="px-4 py-3 bg-[#F2994A] hover:bg-[#e08936] text-[#FEFAF5] border-2 border-[#FEFAF5] rounded-2xl transition flex items-center justify-center"><div className="cross-icon"></div></button>
+                            <button onClick={() => loadHistoryVideo(item)} className="flex-1 text-left px-5 py-3 border-2 rounded-2xl transition text-sm truncate hover:opacity-80" style={{...inputStyle, backgroundColor: isDarkMode ? theme.bg : '#F9FAFB'}}>{item.url}</button>
+                            <button onClick={() => deleteFromHistory(idx)} className="px-4 py-3 border-2 rounded-2xl transition flex items-center justify-center hover:opacity-90" style={secondaryBtnStyle}><div className="cross-icon"></div></button>
                           </div>
                         ))}
                       </div>
@@ -455,19 +633,24 @@
 
                   {/* EN COURS */}
                   {tasksInProgress.length > 0 && (
-                    <div className="bg-[#FEFAF5] p-8 rounded-3xl border-2 border-[#151515]">
-                      <h2 className="text-xl font-semibold mb-4 text-[#151515]">En cours</h2>
+                    <div className="p-8 rounded-3xl border-2" style={cardStyle}>
+                      <h2 className="text-xl font-semibold mb-4">En cours</h2>
                       <div className="space-y-3">
                         {tasksInProgress.map((task, index) => {
                           const isActive = activeTaskId === task.id;
+                          // Style dynamique pour la carte active
+                          const activeCardStyle = isActive 
+                            ? { backgroundColor: isDarkMode ? '#111827' : '#FFFFFF', borderColor: theme.secondary, color: theme.text, boxShadow: `0 4px 6px -1px ${theme.secondary}40` } 
+                            : { ...inputStyle, backgroundColor: isDarkMode ? theme.bg : '#FFFFFF' };
+
                           return (
-                            <div key={task.id} draggable onDragStart={() => (dragItem.current = index)} onDragEnter={() => (dragOverItem.current = index)} onDragEnd={handleSort} onDragOver={(e) => e.preventDefault()} onClick={() => activateTask(task.id)} className={`p-4 rounded-2xl border-2 card-draggable transition-all cursor-pointer relative group ${isActive ? 'bg-blue-50 border-blue-500 shadow-md scale-[1.02]' : 'bg-white border-[#151515] hover:border-blue-300 hover:bg-slate-50'}`}>
-                                {isActive && <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-green-500 active-dot border-2 border-white"></div>}
+                            <div key={task.id} draggable onDragStart={() => (dragItem.current = index)} onDragEnter={() => (dragOverItem.current = index)} onDragEnd={handleSort} onDragOver={(e) => e.preventDefault()} onClick={() => activateTask(task.id)} className={`p-4 rounded-2xl border-2 card-draggable transition-all cursor-pointer relative group ${isActive ? 'scale-[1.02]' : 'hover:opacity-80'}`} style={activeCardStyle}>
+                                {isActive && <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full active-dot border-2 border-white" style={{backgroundColor: theme.accent}}></div>}
                                 <div className="flex justify-between items-start mb-2 pl-3">
-                                  <div className={`font-medium flex-1 flex items-center ${isActive ? 'text-blue-700' : 'text-[#151515]'}`}><GripHandle />{task.name}{isActive && <span className="ml-2 text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-bold">ACTIVE</span>}</div>
-                                  <button onClick={(e) => completeTask(task.id, e)} className="px-3 py-1 bg-[#F2994A] hover:bg-[#e08936] text-[#FEFAF5] border-2 border-[#FEFAF5] rounded-xl text-xs transition ml-2 z-10 relative">Fini</button>
+                                  <div className="font-medium flex-1 flex items-center" style={{color: isActive ? theme.secondary : theme.text}}><GripHandle />{task.name}{isActive && <span className="ml-2 text-xs px-2 py-0.5 rounded-full font-bold" style={{backgroundColor: theme.secondary, color: '#fff'}}>ACTIVE</span>}</div>
+                                  <button onClick={(e) => completeTask(task.id, e)} className="px-3 py-1 border-2 rounded-xl text-xs transition ml-2 z-10 relative hover:opacity-90" style={secondaryBtnStyle}>Fini</button>
                                 </div>
-                                <div className="text-xs text-slate-600 font-medium pl-9">Temps: {formatCycles(currentCycle - task.startCycle + 1)} / Visé: {formatCycles(task.targetCycles)}</div>
+                                <div className="text-xs font-medium pl-9 opacity-70">Temps: {formatCycles(currentCycle - task.startCycle + 1)} / Visé: {formatCycles(task.targetCycles)}</div>
                             </div>
                           );
                         })}
@@ -477,24 +660,24 @@
 
                   {/* HISTORIQUE TACHES + STATS */}
                   {completedTasks.length > 0 && (
-                    <div className="bg-[#FEFAF5] p-8 rounded-3xl border-2 border-[#151515]">
+                    <div className="p-8 rounded-3xl border-2" style={cardStyle}>
                       <div className="flex justify-between items-center mb-4">
-                         <h2 className="text-xl font-semibold text-[#151515]">Historique des tâches</h2>
+                         <h2 className="text-xl font-semibold">Historique Tâches</h2>
                          <button onClick={clearAllCompletedTasks} className="text-xs px-2 py-1 bg-red-100 text-red-600 border border-red-200 rounded hover:bg-red-200">Effacer</button>
                       </div>
                       <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
                         {completedTasks.slice(0, 10).map((task) => (
-                          <div key={task.id} className="bg-white p-3 rounded-xl border border-slate-200 text-sm">
+                          <div key={task.id} className="p-3 rounded-xl border text-sm" style={{...inputStyle, backgroundColor: isDarkMode ? theme.bg : '#FFFFFF'}}>
                             <div className="flex justify-between items-center">
                               <div className="font-medium">{task.name}</div>
                               <div className="flex gap-2">
-                                <button onClick={() => moveToInProgress(task.id)} className="text-[#F2994A] hover:underline text-xs">Reprendre</button>
-                                <button onClick={() => deleteCompletedTask(task.id)} className="text-slate-400 hover:text-red-500"><div className="trash-icon" style={{transform: 'scale(0.8)'}}></div></button>
+                                <button onClick={() => moveToInProgress(task.id)} className="hover:underline text-xs" style={{color: theme.secondary}}>Reprendre</button>
+                                <button onClick={() => deleteCompletedTask(task.id)} className="opacity-50 hover:opacity-100 hover:text-red-500"><div className="trash-icon" style={{transform: 'scale(0.8)'}}></div></button>
                               </div>
                             </div>
-                            <div className="flex justify-between mt-1 text-xs text-slate-500">
+                            <div className="flex justify-between mt-1 text-xs opacity-70">
                                 <span>{formatCycles(task.cycles)} / {formatCycles(task.targetCycles || 0)}</span>
-                                <span className={task.cycles < task.targetCycles ? 'text-green-600 font-bold' : task.cycles > task.targetCycles ? 'text-red-500 font-bold' : ''}>
+                                <span className={task.cycles < task.targetCycles ? 'text-green-500 font-bold' : task.cycles > task.targetCycles ? 'text-red-500 font-bold' : ''}>
                                     {task.cycles < task.targetCycles ? '+1 Vie' : task.cycles > task.targetCycles ? '-1 Vie' : 'Neutre'}
                                 </span>
                             </div>
@@ -505,15 +688,15 @@
                   )}
                   
                   {Object.keys(taskStats).length > 0 && (
-                    <div className="bg-[#FEFAF5] p-8 rounded-3xl border-2 border-[#151515]">
-                        <h2 className="text-xl font-semibold mb-4 text-[#151515]">Statistiques</h2>
+                    <div className="p-8 rounded-3xl border-2" style={cardStyle}>
+                        <h2 className="text-xl font-semibold mb-4">Statistiques</h2>
                         <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
                             {Object.entries(taskStats).map(([taskName, stats]) => (
-                                <div key={taskName} className="bg-white p-3 rounded-xl border-2 border-[#151515] flex justify-between items-center text-sm">
+                                <div key={taskName} className="p-3 rounded-xl border-2 flex justify-between items-center text-sm" style={{...inputStyle, backgroundColor: isDarkMode ? theme.bg : '#FFFFFF'}}>
                                     <span className="font-medium truncate flex-1 pr-2">{taskName}</span>
                                     <div className="flex items-center gap-3">
-                                        <span className="text-slate-600">Moy. {formatCycles(getAverageTime(taskName))}</span>
-                                        <button onClick={() => deleteStat(taskName)} className="text-slate-400 hover:text-red-500"><div className="trash-icon"></div></button>
+                                        <span className="opacity-70">Moy. {formatCycles(getAverageTime(taskName))}</span>
+                                        <button onClick={() => deleteStat(taskName)} className="opacity-50 hover:opacity-100 hover:text-red-500"><div className="trash-icon"></div></button>
                                     </div>
                                 </div>
                             ))}
@@ -522,69 +705,102 @@
                   )}
                 </div>
 
-                {/* --- COLONNE DROITE (TIMER, SETTINGS, NEW TASK, SUCCESS) --- */}
+                {/* --- COLONNE DROITE --- */}
                 <div className="space-y-6">
                   
                   {/* TIMER COMPRESSED */}
-                  <div className="bg-[#FEFAF5] p-6 rounded-3xl border-2 border-[#151515] text-center relative overflow-visible">
-                    <div className="mb-2"><span className="text-sm font-medium text-slate-600">{isWorkSession ? 'Session de travail' : 'Pause'} • Cycle {currentCycle}/8</span></div>
+                  <div className="p-6 rounded-3xl border-2 text-center relative overflow-visible" style={cardStyle}>
+                    <div className="mb-2"><span className="text-sm font-medium opacity-70">{isWorkSession ? 'Session de travail' : 'Pause'} • Cycle {currentCycle}/8</span></div>
                     <div className="relative w-48 h-48 mx-auto mb-6 flex items-center justify-center">
-                        <ProgressRing radius={96} stroke={8} progress={progressPercentage} />
-                        <div className="text-5xl font-bold text-[#151515] z-10">{formatTime(timeLeft)}</div>
+                        <ProgressRing radius={96} stroke={8} progress={progressPercentage} color={theme.primary} trackColor={isDarkMode ? '#374151' : '#e5e7eb'} />
+                        <div className="text-5xl font-bold z-10">{formatTime(timeLeft)}</div>
                     </div>
                     <div className="flex justify-center gap-3 mb-4">
-                      <button onClick={toggleTimer} className={`w-16 p-3 border-2 rounded-2xl transition flex items-center justify-center ${!activeTaskId && !isRunning ? 'bg-slate-200 text-slate-400 cursor-not-allowed border-slate-300' : isRunning ? 'bg-[#F2994A] border-[#FEFAF5] text-[#FEFAF5]' : 'bg-[#FEFAF5] border-[#151515] text-[#151515]'}`}>
+                      <button onClick={toggleTimer} className={`w-16 p-3 border-2 rounded-2xl transition flex items-center justify-center ${!activeTaskId && !isRunning ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-90'}`} style={isRunning ? mainBtnStyle : inputStyle}>
                         {isRunning ? <div className="pause-icon"><div className="pause-bar"></div><div className="pause-bar"></div></div> : <div className="play-icon"></div>}
                       </button>
-                      <button onClick={stopTimer} className="w-16 p-3 bg-[#F2994A] border-2 border-[#FEFAF5] text-[#FEFAF5] rounded-2xl flex items-center justify-center"><div className="stop-icon"></div></button>
-                      <button onClick={resetTimer} className="w-16 p-3 bg-[#F2994A] border-2 border-[#FEFAF5] text-[#FEFAF5] rounded-2xl flex items-center justify-center"><div className="reset-icon"></div></button>
+                      <button onClick={stopTimer} className="w-16 p-3 border-2 rounded-2xl flex items-center justify-center hover:opacity-90" style={secondaryBtnStyle}><div className="stop-icon"></div></button>
+                      <button onClick={resetTimer} className="w-16 p-3 border-2 rounded-2xl flex items-center justify-center hover:opacity-90" style={secondaryBtnStyle}><div className="reset-icon"></div></button>
                     </div>
-                    <div className="text-sm font-semibold text-[#FEFAF5] bg-[#F2994A] py-2 px-4 rounded-xl border-2 border-[#151515]">
+                    <div className="text-sm font-semibold py-2 px-4 rounded-xl border-2" style={{...secondaryBtnStyle, backgroundColor: theme.secondary}}>
                       Aujourd'hui : {todayPomodoros} pomodoro{todayPomodoros > 1 ? 's' : ''} ({Math.floor(todayMinutes / 60)}h {todayMinutes % 60}m)
                     </div>
                   </div>
                   
-                  {/* REGLAGES */}
-                  <div className="bg-[#FEFAF5] p-8 rounded-3xl border-2 border-[#151515]">
-                    <h2 className="text-xl font-semibold mb-4 text-[#151515]">Réglages</h2>
-                    <div className="grid grid-cols-3 gap-3 mb-6">
-                        <div><label className="block text-xs font-medium mb-1 text-slate-500">Travail</label><input type="number" value={workTime} onChange={(e) => { let v = Math.max(0, Math.min(60, parseInt(e.target.value)||0)); setWorkTime(v); if (isWorkSession && !isRunning) { setTimeLeft(v*60); setTotalTimeForCurrentSession(v*60); }}} className="w-full px-2 py-2 bg-white border-2 border-[#151515] rounded-xl text-center" min="0" max="60"/></div>
-                        <div><label className="block text-xs font-medium mb-1 text-slate-500">P. Courte</label><input type="number" value={shortBreak} onChange={(e) => setShortBreak(Math.max(0, Math.min(60, parseInt(e.target.value)||0)))} className="w-full px-2 py-2 bg-white border-2 border-[#151515] rounded-xl text-center" min="0" max="60"/></div>
-                        <div><label className="block text-xs font-medium mb-1 text-slate-500">P. Longue</label><input type="number" value={longBreak} onChange={(e) => setLongBreak(Math.max(0, Math.min(60, parseInt(e.target.value)||0)))} className="w-full px-2 py-2 bg-white border-2 border-[#151515] rounded-xl text-center" min="0" max="60"/></div>
+                  {/* REGLAGES + THEMES */}
+                  <div className="p-8 rounded-3xl border-2" style={cardStyle}>
+                    <h2 className="text-xl font-semibold mb-4">Réglages</h2>
+                    
+                    {/* Theme Selector */}
+                    <div className="flex justify-between items-center mb-6 p-2 rounded-xl bg-opacity-10 bg-slate-500">
+                        <div className="flex gap-2">
+                            {Object.keys(THEMES).map(key => (
+                                <button 
+                                    key={key} 
+                                    onClick={() => changeTheme(key)}
+                                    className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${currentThemeKey === key ? 'ring-2 ring-offset-2 ring-current scale-110' : ''}`}
+                                    style={{backgroundColor: THEMES[key].day.primary, borderColor: THEMES[key].day.secondary}}
+                                    title={THEMES[key].name}
+                                ></button>
+                            ))}
+                        </div>
+                        
+                        {/* iOS Switch Day/Night */}
+                        <div 
+                            className="relative w-14 h-8 rounded-full cursor-pointer transition-colors duration-300 flex items-center px-1"
+                            style={{backgroundColor: isDarkMode ? '#4B5563' : '#93C5FD'}}
+                            onClick={toggleDarkMode}
+                        >
+                            {/* Icons inside track */}
+                            <span className="absolute left-1.5 text-xs">☀️</span>
+                            <span className="absolute right-1.5 text-xs">🌙</span>
+                            
+                            {/* Thumb */}
+                            <div 
+                                className="w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 z-10"
+                                style={{transform: isDarkMode ? 'translateX(24px)' : 'translateX(0)'}}
+                            ></div>
+                        </div>
                     </div>
-                    <div><label className="block text-xs font-medium mb-1 text-slate-500">Volume ({Math.round(volume * 100)}%)</label><input type="range" min="0" max="1" step="0.1" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} className="w-full accent-[#151515] h-2 bg-white rounded-lg appearance-none cursor-pointer border border-[#151515]"/></div>
+
+                    <div className="grid grid-cols-3 gap-3 mb-6">
+                        <div><label className="block text-xs font-medium mb-1 opacity-70">Travail</label><input type="number" value={workTime} onChange={(e) => { let v = Math.max(0, Math.min(60, parseInt(e.target.value)||0)); setWorkTime(v); if (isWorkSession && !isRunning) { setTimeLeft(v*60); setTotalTimeForCurrentSession(v*60); }}} className="w-full px-2 py-2 border-2 rounded-xl text-center focus:outline-none" style={inputStyle} min="0" max="60"/></div>
+                        <div><label className="block text-xs font-medium mb-1 opacity-70">P. Courte</label><input type="number" value={shortBreak} onChange={(e) => setShortBreak(Math.max(0, Math.min(60, parseInt(e.target.value)||0)))} className="w-full px-2 py-2 border-2 rounded-xl text-center focus:outline-none" style={inputStyle} min="0" max="60"/></div>
+                        <div><label className="block text-xs font-medium mb-1 opacity-70">P. Longue</label><input type="number" value={longBreak} onChange={(e) => setLongBreak(Math.max(0, Math.min(60, parseInt(e.target.value)||0)))} className="w-full px-2 py-2 border-2 rounded-xl text-center focus:outline-none" style={inputStyle} min="0" max="60"/></div>
+                    </div>
+                    <div><label className="block text-xs font-medium mb-1 opacity-70">Volume ({Math.round(volume * 100)}%)</label><input type="range" min="0" max="1" step="0.1" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} className="w-full h-2 rounded-lg appearance-none cursor-pointer" style={{accentColor: theme.primary, backgroundColor: theme.border}}/></div>
                   </div>
 
                   {/* NEW TASK */}
-                  <div className="bg-[#FEFAF5] p-8 rounded-3xl border-2 border-[#151515]">
-                    <h2 className="text-xl font-semibold mb-4 text-[#151515]">Nouvelle tâche</h2>
+                  <div className="p-8 rounded-3xl border-2" style={cardStyle}>
+                    <h2 className="text-xl font-semibold mb-4">Nouvelle tâche</h2>
                     <div className="space-y-4">
-                      <input type="text" value={currentTask} onChange={(e) => setCurrentTask(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && startTask()} placeholder="Nom de la tâche..." className="w-full px-4 py-3 bg-white border-2 border-[#151515] rounded-2xl focus:outline-none" />
-                      <div className="bg-white border-2 border-[#151515] rounded-2xl p-3 flex flex-col items-center">
-                          <label className="text-xs font-medium text-slate-500 mb-2">Objectif (Temps visé)</label>
+                      <input type="text" value={currentTask} onChange={(e) => setCurrentTask(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && startTask()} placeholder="Nom de la tâche..." className="w-full px-4 py-3 border-2 rounded-2xl focus:outline-none" style={inputStyle} />
+                      <div className="rounded-2xl p-3 flex flex-col items-center border-2" style={{...inputStyle, backgroundColor: isDarkMode ? theme.bg : '#FFFFFF'}}>
+                          <label className="text-xs font-medium opacity-50 mb-2">Objectif (Temps visé)</label>
                           <div className="flex items-center gap-4 w-full justify-between px-2">
-                              <button onClick={() => adjustTargetCycles(-2)} className="w-10 h-10 flex items-center justify-center border-2 border-[#151515] rounded-xl hover:bg-slate-50"><div className="w-3 h-1 bg-current rounded-sm"></div></button>
-                              <div className="text-lg font-bold text-[#151515]">{getTargetLabel(targetCycles)}</div>
-                              <button onClick={() => adjustTargetCycles(2)} className="w-10 h-10 flex items-center justify-center border-2 border-[#151515] rounded-xl hover:bg-slate-50 relative"><div className="absolute w-3 h-1 bg-current rounded-sm"></div><div className="absolute w-1 h-3 bg-current rounded-sm"></div></button>
+                              <button onClick={() => adjustTargetCycles(-2)} className="w-10 h-10 flex items-center justify-center border-2 rounded-xl hover:opacity-70 transition" style={{borderColor: theme.border}}><div className="w-3 h-1 bg-current rounded-sm"></div></button>
+                              <div className="text-lg font-bold">{getTargetLabel(targetCycles)}</div>
+                              <button onClick={() => adjustTargetCycles(2)} className="w-10 h-10 flex items-center justify-center border-2 rounded-xl hover:opacity-70 transition relative" style={{borderColor: theme.border}}><div className="absolute w-3 h-1 bg-current rounded-sm"></div><div className="absolute w-1 h-3 bg-current rounded-sm"></div></button>
                           </div>
                       </div>
-                      <button onClick={startTask} disabled={!currentTask.trim()} className="w-full px-5 py-3 bg-[#151515] hover:bg-[#2a2a2a] text-white disabled:bg-slate-300 disabled:cursor-not-allowed rounded-2xl font-medium transition border-2 border-[#151515]">GO !</button>
+                      <button onClick={startTask} disabled={!currentTask.trim()} className="w-full px-5 py-3 text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-2xl font-medium transition border-2 hover:opacity-90" style={mainBtnStyle}>GO !</button>
                     </div>
                   </div>
 
                   {/* SUCCES (BADGES) */}
-                  <div className="bg-[#FEFAF5] p-8 rounded-3xl border-2 border-[#151515]">
-                      <h2 className="text-xl font-semibold mb-4 text-[#151515]">Succès</h2>
+                  <div className="p-8 rounded-3xl border-2" style={cardStyle}>
+                      <h2 className="text-xl font-semibold mb-4">Succès</h2>
                       <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
                           {BADGES_DEF.map((badge) => {
                               const unlocked = badges.includes(badge.id);
                               return (
-                                  <div key={badge.id} className={`group relative flex flex-col items-center text-center p-2 rounded-xl transition cursor-help ${unlocked ? 'bg-white border-2 border-yellow-400 trophy-unlocked' : 'opacity-50 trophy-locked'}`}>
+                                  <div key={badge.id} className={`group relative flex flex-col items-center text-center p-2 rounded-xl transition cursor-help ${unlocked ? 'border-2 trophy-unlocked' : 'opacity-50 trophy-locked'}`} style={unlocked ? {borderColor: theme.accent, backgroundColor: isDarkMode ? theme.bg : '#fff'} : {}}>
                                       <div className="text-3xl mb-1">{badge.icon}</div>
                                       <div className="text-[10px] font-bold leading-tight">{badge.name}</div>
-                                      <div className="absolute bottom-full mb-2 w-32 p-2 bg-[#151515] text-white text-[10px] rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-20 pointer-events-none shadow-xl">
+                                      <div className="absolute bottom-full mb-2 w-32 p-2 text-white text-[10px] rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-20 pointer-events-none shadow-xl" style={{backgroundColor: theme.text, color: theme.bg}}>
                                           {badge.desc}
-                                          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#151515]"></div>
+                                          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent" style={{borderTopColor: theme.text}}></div>
                                       </div>
                                   </div>
                               );
