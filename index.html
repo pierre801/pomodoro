@@ -88,11 +88,11 @@
           const [isPlaylist, setIsPlaylist] = useState(false);
           const [playlistId, setPlaylistId] = useState('');
           
-          const [workTime, setWorkTime] = useState(25);
-          const [shortBreak, setShortBreak] = useState(5);
-          const [longBreak, setLongBreak] = useState(15);
-          const [timeLeft, setTimeLeft] = useState(25 * 60);
-          const [totalTimeForCurrentSession, setTotalTimeForCurrentSession] = useState(25 * 60);
+          const [workTime, setWorkTime] = useState(30);
+          const [shortBreak, setShortBreak] = useState(0);
+          const [longBreak, setLongBreak] = useState(20);
+          const [timeLeft, setTimeLeft] = useState(30 * 60);
+          const [totalTimeForCurrentSession, setTotalTimeForCurrentSession] = useState(30 * 60);
           
           const [isRunning, setIsRunning] = useState(false);
           const [currentCycle, setCurrentCycle] = useState(1);
@@ -452,6 +452,39 @@
                     </div>
                   </div>
 
+                  {/* RESTORED VIDEO HISTORY */}
+                  {videoHistory.length > 0 && (
+                    <div className="bg-[#FEFAF5] p-8 rounded-3xl border-2 border-[#151515]">
+                      <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-xl font-semibold text-[#151515]">Historique des vidéos</h2>
+                        <button
+                          onClick={clearHistory}
+                          className="text-sm px-4 py-2 bg-[#F2994A] text-[#FEFAF5] hover:bg-[#e08936] border-2 border-[#FEFAF5] rounded-xl transition"
+                        >
+                          Vider
+                        </button>
+                      </div>
+                      <div className="space-y-3">
+                        {videoHistory.map((item, idx) => (
+                          <div key={idx} className="flex items-center gap-3">
+                            <button
+                              onClick={() => loadHistoryVideo(item)}
+                              className="flex-1 text-left px-5 py-3 bg-white hover:bg-slate-50 border-2 border-[#151515] rounded-2xl transition text-sm truncate text-[#151515]"
+                            >
+                              {item.url}
+                            </button>
+                            <button
+                              onClick={() => deleteFromHistory(idx)}
+                              className="px-4 py-3 bg-[#F2994A] hover:bg-[#e08936] text-[#FEFAF5] border-2 border-[#FEFAF5] rounded-2xl transition flex items-center justify-center"
+                            >
+                              <div className="cross-icon"></div>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="bg-[#FEFAF5] p-8 rounded-3xl border-2 border-[#151515]">
                       <h2 className="text-xl font-semibold mb-4 text-[#151515]">Succès</h2>
                       <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
@@ -541,8 +574,8 @@
                     <h2 className="text-xl font-semibold mb-4 text-[#151515]">Réglages</h2>
                     <div className="grid grid-cols-3 gap-3 mb-6">
                         <div><label className="block text-xs font-medium mb-1 text-slate-500">Travail</label><input type="number" value={workTime} onChange={(e) => { let v = Math.max(0, Math.min(60, parseInt(e.target.value)||0)); setWorkTime(v); if (isWorkSession && !isRunning) { setTimeLeft(v*60); setTotalTimeForCurrentSession(v*60); }}} className="w-full px-2 py-2 bg-white border-2 border-[#151515] rounded-xl text-center" min="0" max="60"/></div>
-                        <div><label className="block text-xs font-medium mb-1 text-slate-500">P. Courte</label><input type="number" value={shortBreak} onChange={(e) => setShortBreak(Math.max(0, Math.min(60, parseInt(e.target.value)||0)))} className="w-full px-2 py-2 bg-white border-2 border-[#151515] rounded-xl text-center" min="0" max="60"/></div>
-                        <div><label className="block text-xs font-medium mb-1 text-slate-500">P. Longue</label><input type="number" value={longBreak} onChange={(e) => setLongBreak(Math.max(0, Math.min(60, parseInt(e.target.value)||0)))} className="w-full px-2 py-2 bg-white border-2 border-[#151515] rounded-xl text-center" min="0" max="60"/></div>
+                        <div><label className="block text-xs font-medium mb-1 text-slate-500">Pause Courte</label><input type="number" value={shortBreak} onChange={(e) => setShortBreak(Math.max(0, Math.min(60, parseInt(e.target.value)||0)))} className="w-full px-2 py-2 bg-white border-2 border-[#151515] rounded-xl text-center" min="0" max="60"/></div>
+                        <div><label className="block text-xs font-medium mb-1 text-slate-500">Pause Longue</label><input type="number" value={longBreak} onChange={(e) => setLongBreak(Math.max(0, Math.min(60, parseInt(e.target.value)||0)))} className="w-full px-2 py-2 bg-white border-2 border-[#151515] rounded-xl text-center" min="0" max="60"/></div>
                     </div>
                     <div><label className="block text-xs font-medium mb-1 text-slate-500">Volume ({Math.round(volume * 100)}%)</label><input type="range" min="0" max="1" step="0.1" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} className="w-full accent-[#151515] h-2 bg-white rounded-lg appearance-none cursor-pointer border border-[#151515]"/></div>
                   </div>
