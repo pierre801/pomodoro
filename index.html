@@ -105,11 +105,11 @@
           const [videoId, setVideoId] = useState('');
           const [isPlaylist, setIsPlaylist] = useState(false);
           const [playlistId, setPlaylistId] = useState('');
-          const [workTime, setWorkTime] = useState(25);
-          const [shortBreak, setShortBreak] = useState(5);
+          const [workTime, setWorkTime] = useState(30);
+          const [shortBreak, setShortBreak] = useState(1);
           const [longBreak, setLongBreak] = useState(15);
-          const [timeLeft, setTimeLeft] = useState(25 * 60);
-          const [totalTimeForCurrentSession, setTotalTimeForCurrentSession] = useState(25 * 60);
+          const [timeLeft, setTimeLeft] = useState(30 * 60);
+          const [totalTimeForCurrentSession, setTotalTimeForCurrentSession] = useState(30 * 60);
           const [isRunning, setIsRunning] = useState(false);
           const [currentCycle, setCurrentCycle] = useState(1);
           const [isWorkSession, setIsWorkSession] = useState(true);
@@ -117,6 +117,7 @@
           const [todayPomodoros, setTodayPomodoros] = useState(0);
           const [lastResetDate, setLastResetDate] = useState('');
           const [currentTask, setCurrentTask] = useState('');
+          const [taskStartCycle, setTaskStartCycle] = useState(1);
           const [targetCycles, setTargetCycles] = useState(2); 
           const [tasksInProgress, setTasksInProgress] = useState([]);
           const [completedTasks, setCompletedTasks] = useState([]);
@@ -217,30 +218,9 @@
             }
           };
 
-          // --- CORE TIMER LOGIC ---
-          useEffect(() => {
-            let interval = null;
-            if (isRunning && timeLeft > 0) {
-              interval = setInterval(() => {
-                setTimeLeft((prev) => {
-                    const nextVal = prev - 1;
-                    if (nextVal <= 10 && nextVal > 0) playTickSound();
-                    return nextVal;
-                });
-              }, 1000);
-            } else if (timeLeft === 0 && isRunning) {
-               handleCycleEnd();
-            }
-            return () => clearInterval(interval);
-          }, [isRunning, timeLeft]);
-
           const initAudio = () => {
-              if (!audioContextRef.current) {
-                  audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
-              }
-              if (audioContextRef.current.state === 'suspended') {
-                  audioContextRef.current.resume();
-              }
+              if (!audioContextRef.current) { audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)(); }
+              if (audioContextRef.current.state === 'suspended') { audioContextRef.current.resume(); }
           };
 
           const playTickSound = () => {
@@ -263,8 +243,10 @@
             }
           };
 
+          // --- LOGIQUE DE CYCLE ET BOUCLE INFINIE ---
           const handleCycleEnd = () => {
             playBellSound();
+            
             let nextCycle = currentCycle + 1;
             if (currentCycle >= 8) nextCycle = 1;
             setCurrentCycle(nextCycle);
@@ -278,13 +260,13 @@
                 nextDuration = workTime * 60;
                 sendNotification("Au travail", "Concentration maximale !");
             } else {
-                // --- FIN SESSION TRAVAIL -> PAUSE ---
+                // FIN DE SESSION DE TRAVAIL
                 const newPomodoros = todayPomodoros + 1;
                 setTodayPomodoros(newPomodoros);
                 localStorage.setItem('todayPomodoros', newPomodoros.toString());
                 addXp(100); 
                 
-                // MISE A JOUR DU TEMPS DE LA TACHE ACTIVE
+                // --- CRUCIAL: Incrémenter le compteur de la tâche active ---
                 if (activeTaskId) {
                     const updatedTasks = tasksInProgress.map(t => {
                         if (t.id === activeTaskId) {
@@ -310,27 +292,66 @@
                 else { nextDuration = shortBreak * 60; sendNotification("Pause Courte", "Petite pause."); }
             }
             
-            if (nextDuration > 0) {
-                setTimeLeft(nextDuration);
-                setTotalTimeForCurrentSession(nextDuration);
-            } else {
-                setIsRunning(false);
-            }
+            // Relance immédiate
+            setTimeLeft(nextDuration);
+            setTotalTimeForCurrentSession(nextDuration);
+            
             if (playerRef.current && playerRef.current.playVideo) playerRef.current.playVideo();
           };
 
+          // --- MOTEUR DE TEMPS (SÉPARÉ POUR STABILITÉ) ---
+          useEffect(() => {
+            let interval = null;
+            if (isRunning) {
+                interval = setInterval(() => {
+                    setTimeLeft((prev) => {
+                        // TIC-TAC
+                        if (prev <= 1) {
+                            // C'est fini, on déclenche la suite et on ne renvoie pas 0 pour éviter l'arrêt
+                            handleCycleEnd();
+                            return 0; // On renvoie 0 mais le handleCycleEnd va reset le timeLeft juste après
+                        }
+                        
+                        // Son des 10 dernières secondes
+                        if (prev <= 11 && prev > 1) {
+                            playTickSound();
+                        }
+                        
+                        return prev - 1;
+                    });
+                }, 1000);
+            }
+            return () => clearInterval(interval);
+          }, [isRunning, currentCycle, isWorkSession, activeTaskId, tasksInProgress]); // Dépendances importantes pour le handleCycleEnd intégré
+
+          // --- COMMANDES ---
           const toggleTimer = () => {
             if (!activeTaskId && !isRunning) { alert("⚠️ Sélectionnez une tâche pour commencer !"); return; }
             initAudio(); 
             const newRunningState = !isRunning; setIsRunning(newRunningState);
             if (playerRef.current) { if (newRunningState && playerRef.current.playVideo) playerRef.current.playVideo(); else if (!newRunningState && playerRef.current.pauseVideo) playerRef.current.pauseVideo(); }
           };
+          
           const stopTimer = () => {
+            // STOP MANUEL: On crédite le cycle entamé
+            if (activeTaskId && isWorkSession) {
+                const updatedTasks = tasksInProgress.map(t => {
+                    if (t.id === activeTaskId) {
+                        return { ...t, spentCycles: (t.spentCycles || 0) + 1 };
+                    }
+                    return t;
+                });
+                setTasksInProgress(updatedTasks);
+                localStorage.setItem('tasksInProgress', JSON.stringify(updatedTasks));
+                addXp(50); 
+            }
+
             setIsRunning(false); setCurrentCycle(1); setIsWorkSession(true);
             const t = workTime * 60; setTimeLeft(t); setTotalTimeForCurrentSession(t);
             setActiveTaskId(null);
             if (playerRef.current && playerRef.current.pauseVideo) playerRef.current.pauseVideo();
           };
+          
           const resetTimer = () => {
             setIsRunning(false); setCurrentCycle(1); setIsWorkSession(true);
             const t = workTime * 60; setTimeLeft(t); setTotalTimeForCurrentSession(t);
@@ -362,24 +383,31 @@
             if (playerRef.current && playerRef.current.playVideo) playerRef.current.playVideo();
           };
 
-          const activateTask = (taskId) => { setActiveTaskId(taskId); };
+          const activateTask = (taskId) => { setActiveTaskId(taskId); initAudio(); };
 
           const completeTask = (taskId, e) => {
             e.stopPropagation();
             const task = tasksInProgress.find(t => t.id === taskId); if (!task) return;
-            const cyclesSpent = task.spentCycles || 0; // Use accumulated cycles
-            addXp(50 * Math.max(1, cyclesSpent)); // Min 50 XP
+            
+            // FIN DE TACHE: Ajouter le cycle en cours si actif
+            let finalCycles = task.spentCycles || 0;
+            if (activeTaskId === taskId && isWorkSession) {
+                finalCycles += 1;
+            }
+
+            addXp(50 * Math.max(1, finalCycles)); 
             let newLives = lives;
-            if (cyclesSpent < task.targetCycles) newLives = Math.min(lives + 1, 10);
-            else if (cyclesSpent > task.targetCycles) newLives = Math.max(lives - 1, 0);
+            if (finalCycles < task.targetCycles) newLives = Math.min(lives + 1, 10);
+            else if (finalCycles > task.targetCycles) newLives = Math.max(lives - 1, 0);
             setLives(newLives); localStorage.setItem('pomodoroLives', newLives);
             if (newLives === 0) { setShowGameOver(true); stopTimer(); }
-            const completedTask = { ...task, cycles: cyclesSpent, completedAt: new Date().toISOString() };
+            
+            const completedTask = { ...task, cycles: finalCycles, completedAt: new Date().toISOString() };
             const newCompletedTasks = [completedTask, ...completedTasks];
             setCompletedTasks(newCompletedTasks); localStorage.setItem('completedTasks', JSON.stringify(newCompletedTasks));
             const newStats = { ...taskStats };
             if (!newStats[task.name]) newStats[task.name] = { totalCycles: 0, count: 0 };
-            newStats[task.name].totalCycles += cyclesSpent; newStats[task.name].count += 1;
+            newStats[task.name].totalCycles += finalCycles; newStats[task.name].count += 1;
             setTaskStats(newStats); localStorage.setItem('taskStats', JSON.stringify(newStats));
             const newTasksInProgress = tasksInProgress.filter(t => t.id !== taskId);
             setTasksInProgress(newTasksInProgress); localStorage.setItem('tasksInProgress', JSON.stringify(newTasksInProgress));
@@ -398,7 +426,8 @@
 
           const moveToInProgress = (taskId) => {
             const task = completedTasks.find(t => t.id === taskId); if (!task) return;
-            const restoredTask = { id: Date.now(), name: task.name, spentCycles: 0, targetCycles: task.targetCycles || 2, startedAt: new Date().toISOString() };
+            // REPRISE: On garde le nombre de cycles déjà passés
+            const restoredTask = { id: Date.now(), name: task.name, spentCycles: task.cycles || 0, targetCycles: task.targetCycles || 2, startedAt: new Date().toISOString() };
             setTasksInProgress([...tasksInProgress, restoredTask]); localStorage.setItem('tasksInProgress', JSON.stringify([...tasksInProgress, restoredTask]));
             const newCompleted = completedTasks.filter(t => t.id !== taskId); setCompletedTasks(newCompleted); localStorage.setItem('completedTasks', JSON.stringify(newCompleted));
           };
@@ -637,8 +666,8 @@
 
                     <div className="grid grid-cols-3 gap-3 mb-6">
                         <div><label className="block text-xs font-medium mb-1 opacity-70">Travail</label><input type="number" value={workTime} onChange={(e) => { let v = Math.max(0, Math.min(60, parseInt(e.target.value)||0)); setWorkTime(v); if (isWorkSession && !isRunning) { setTimeLeft(v*60); setTotalTimeForCurrentSession(v*60); }}} className="w-full px-2 py-2 border-2 rounded-xl text-center focus:outline-none" style={inputStyle} min="0" max="60"/></div>
-                        <div><label className="block text-xs font-medium mb-1 opacity-70">P. Courte</label><input type="number" value={shortBreak} onChange={(e) => setShortBreak(Math.max(0, Math.min(60, parseInt(e.target.value)||0)))} className="w-full px-2 py-2 border-2 rounded-xl text-center focus:outline-none" style={inputStyle} min="0" max="60"/></div>
-                        <div><label className="block text-xs font-medium mb-1 opacity-70">P. Longue</label><input type="number" value={longBreak} onChange={(e) => setLongBreak(Math.max(0, Math.min(60, parseInt(e.target.value)||0)))} className="w-full px-2 py-2 border-2 rounded-xl text-center focus:outline-none" style={inputStyle} min="0" max="60"/></div>
+                        <div><label className="block text-xs font-medium mb-1 opacity-70">Pause courte</label><input type="number" value={shortBreak} onChange={(e) => setShortBreak(Math.max(0, Math.min(60, parseInt(e.target.value)||0)))} className="w-full px-2 py-2 border-2 rounded-xl text-center focus:outline-none" style={inputStyle} min="0" max="60"/></div>
+                        <div><label className="block text-xs font-medium mb-1 opacity-70">Pause longue</label><input type="number" value={longBreak} onChange={(e) => setLongBreak(Math.max(0, Math.min(60, parseInt(e.target.value)||0)))} className="w-full px-2 py-2 border-2 rounded-xl text-center focus:outline-none" style={inputStyle} min="0" max="60"/></div>
                     </div>
                     <div><label className="block text-xs font-medium mb-1 opacity-70">Volume ({Math.round(volume * 100)}%)</label><input type="range" min="0" max="1" step="0.1" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} className="w-full h-2 rounded-lg appearance-none cursor-pointer" style={{accentColor: theme.primary, backgroundColor: theme.border}}/></div>
                   </div>
