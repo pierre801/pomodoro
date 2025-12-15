@@ -73,7 +73,6 @@
             pastel: { name: "Douceur", day: { bg: "#FDF2F8", card: "#FFFFFF", text: "#4B5563", primary: "#F472B6", secondary: "#A78BFA", accent: "#34D399", border: "#FBCFE8" }, night: { bg: "#374151", card: "#4B5563", text: "#F3F4F6", primary: "#F472B6", secondary: "#A78BFA", accent: "#34D399", border: "#6B7280" } }
         };
 
-        // Note: durationMinutes est la durée CIBLE en minutes réelles (ex: 3h = 180min)
         const MARKETING_PRESETS = [
             { name: "Publications semaine", durationMinutes: 180, label: "3h" },
             { name: "Exemple de segmentation", durationMinutes: 180, label: "3h" },
@@ -116,7 +115,6 @@
           const [isPlaylist, setIsPlaylist] = useState(false);
           const [playlistId, setPlaylistId] = useState('');
           
-          // Réglages par défaut : 30 min travail, 1 min pause (votre préférence)
           const [workTime, setWorkTime] = useState(30);
           const [shortBreak, setShortBreak] = useState(1);
           const [longBreak, setLongBreak] = useState(20);
@@ -145,6 +143,10 @@
           const [currentThemeKey, setCurrentThemeKey] = useState('pharow');
           const [isDarkMode, setIsDarkMode] = useState(false);
           
+          // MEDIA MODE & CALENDAR
+          const [mediaMode, setMediaMode] = useState('video'); // 'video' or 'calendar'
+          const [calendarEmail, setCalendarEmail] = useState('');
+
           const intervalRef = useRef(null);
           const audioContextRef = useRef(null);
           const playerRef = useRef(null);
@@ -173,6 +175,9 @@
             const savedBadges = JSON.parse(localStorage.getItem('pomodoroBadges') || '[]');
             const savedTheme = localStorage.getItem('pomodoroTheme') || 'pharow';
             const savedMode = localStorage.getItem('pomodoroDarkMode') === 'true';
+            
+            const savedMediaMode = localStorage.getItem('pomodoroMediaMode') || 'video';
+            const savedCalendarEmail = localStorage.getItem('pomodoroCalendarEmail') || '';
 
             setVideoHistory(history);
             setTodayPomodoros(count);
@@ -185,6 +190,9 @@
             setBadges(savedBadges);
             setCurrentThemeKey(savedTheme);
             setIsDarkMode(savedMode);
+            setMediaMode(savedMediaMode);
+            setCalendarEmail(savedCalendarEmail);
+            
             if (!isNaN(savedLives)) { setLives(savedLives); if (savedLives === 0) setShowGameOver(true); } else { setLives(5); }
             if ("Notification" in window && Notification.permission !== "granted") Notification.requestPermission();
             checkDailyReset();
@@ -217,11 +225,11 @@
           useEffect(() => { document.title = isRunning ? `[${Math.floor(timeLeft / 60)}'] Pomodoro` : "Pomodoro Focus Timer"; }, [timeLeft, isRunning]);
 
           useEffect(() => {
-            if (videoId && window.YT && window.YT.Player) {
+            if (mediaMode === 'video' && videoId && window.YT && window.YT.Player) {
               if (playerRef.current) try { playerRef.current.destroy(); } catch(e) {}
               playerRef.current = new window.YT.Player('youtube-player', { videoId: videoId, playerVars: { autoplay: 0, controls: 1, origin: window.location.origin }, events: { onReady: (e) => { if (isRunning) e.target.playVideo(); } } });
             }
-          }, [videoId]);
+          }, [videoId, mediaMode]);
 
           const checkDailyReset = () => {
             const now = new Date(); const today = now.toDateString(); const storedDate = localStorage.getItem('lastResetDate');
@@ -307,7 +315,7 @@
             } else {
                 setTimeout(() => handleCycleEnd(), 50); 
             }
-            if (playerRef.current && playerRef.current.playVideo) playerRef.current.playVideo();
+            if (mediaMode === 'video' && playerRef.current && playerRef.current.playVideo) playerRef.current.playVideo();
           };
 
           useEffect(() => {
@@ -332,7 +340,7 @@
             if (!activeTaskId && !isRunning) { alert("⚠️ Sélectionnez une tâche pour commencer !"); return; }
             initAudio(); 
             const newRunningState = !isRunning; setIsRunning(newRunningState);
-            if (playerRef.current) { if (newRunningState && playerRef.current.playVideo) playerRef.current.playVideo(); else if (!newRunningState && playerRef.current.pauseVideo) playerRef.current.pauseVideo(); }
+            if (mediaMode === 'video' && playerRef.current) { if (newRunningState && playerRef.current.playVideo) playerRef.current.playVideo(); else if (!newRunningState && playerRef.current.pauseVideo) playerRef.current.pauseVideo(); }
           };
           
           const stopTimer = () => {
@@ -352,13 +360,13 @@
             const t = Math.max(60, workTime * 60); 
             setTimeLeft(t); setTotalTimeForCurrentSession(t);
             setActiveTaskId(null);
-            if (playerRef.current && playerRef.current.pauseVideo) playerRef.current.pauseVideo();
+            if (mediaMode === 'video' && playerRef.current && playerRef.current.pauseVideo) playerRef.current.pauseVideo();
           };
           
           const resetTimer = () => {
             setIsRunning(false); setCurrentCycle(1); setIsWorkSession(true);
             const t = Math.max(60, workTime * 60); setTimeLeft(t); setTotalTimeForCurrentSession(t);
-            if (playerRef.current && playerRef.current.pauseVideo) playerRef.current.pauseVideo();
+            if (mediaMode === 'video' && playerRef.current && playerRef.current.pauseVideo) playerRef.current.pauseVideo();
           };
 
           const extractVideoId = (url) => {
@@ -372,26 +380,12 @@
           const deleteFromHistory = (index) => { const newHistory = videoHistory.filter((_, i) => i !== index); setVideoHistory(newHistory); localStorage.setItem('pomodoroHistory', JSON.stringify(newHistory)); };
           const clearHistory = () => { setVideoHistory([]); localStorage.setItem('pomodoroHistory', '[]'); };
 
-          // --- LOGIQUE INTELLIGENTE DES PRESETS ---
           const handlePresetClick = (preset) => { 
               setCurrentTask(preset.name); 
-              
-              // CALCUL DYNAMIQUE : 
-              // 1 cycle "utilisateur" = workTime + (moyenne des pauses sur un tour complet)
-              // Moyenne pauses = (3 * shortBreak + 1 * longBreak) / 4
-              // Durée moyenne d'un bloc (Travail + Pause) = workTime + (3*S + L)/4
-              
               const avgBreakTime = (shortBreak * 3 + longBreak) / 4;
               const cycleDuration = workTime + avgBreakTime;
-              
-              // Combien de cycles pour atteindre l'objectif en minutes ?
-              // On multiplie par 2 car "targetCycles" compte les pas internes (Travail + Pause)
-              // Donc si je veux 60min et que mon cycle fait 30min, j'ai besoin de 2 sessions de travail.
-              // Chaque session de travail est suivie d'une pause, donc 2 sessions = 4 pas internes (T, P, T, P)
-              
               const workSessionsNeeded = Math.ceil(preset.durationMinutes / cycleDuration);
               const totalSteps = workSessionsNeeded * 2; 
-
               setTargetCycles(totalSteps); 
           };
           
@@ -404,13 +398,12 @@
             setTasksInProgress([...tasksInProgress, newTask]); localStorage.setItem('tasksInProgress', JSON.stringify([...tasksInProgress, newTask]));
             setActiveTaskId(newTask.id); setCurrentCycle(1); setIsWorkSession(true); setCurrentTask(''); setIsRunning(true);
             const t = Math.max(60, workTime * 60); setTotalTimeForCurrentSession(t); setTimeLeft(t);
-            if (playerRef.current && playerRef.current.playVideo) playerRef.current.playVideo();
+            if (mediaMode === 'video' && playerRef.current && playerRef.current.playVideo) playerRef.current.playVideo();
           };
 
           const activateTask = (taskId) => { setActiveTaskId(taskId); initAudio(); };
 
           const addToGoogleCalendar = (task) => {
-              // Estimation durée pour agenda
               const avgBreakTime = (shortBreak * 3 + longBreak) / 4;
               const durationPerWorkSession = workTime + avgBreakTime;
               const workSessions = Math.ceil(task.targetCycles / 2);
@@ -418,40 +411,26 @@
               
               const startDate = new Date();
               const endDate = new Date(startDate.getTime() + totalDurationMin * 60000);
-              
               const formatDate = (date) => date.toISOString().replace(/-|:|\.\d\d\d/g, "");
-              
               const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(task.name)}&dates=${formatDate(startDate)}/${formatDate(endDate)}&details=${encodeURIComponent("Session Pomodoro - Objectif : " + formatCycles(task.targetCycles))}&sf=true&output=xml`;
-              
               window.open(url, '_blank');
           };
 
-          // ESTIMATION FIN DE JOURNEE DYNAMIQUE
           const getEstimatedEndTime = () => {
               let totalRemainingWorkSessions = 0;
-              
               tasksInProgress.forEach(t => {
-                  // Pas restants (T+P)
                   const remainingSteps = Math.max(0, (t.targetCycles || 0) - (t.spentCycles || 0));
-                  // Nombre de sessions de travail restantes (1 session = 2 pas)
                   const workSessions = Math.ceil(remainingSteps / 2);
                   totalRemainingWorkSessions += workSessions;
               });
-              
-              // Calcul précis avec les réglages actuels
               const avgBreakTime = (shortBreak * 3 + longBreak) / 4;
               const durationPerWorkSession = workTime + avgBreakTime;
-              
               let minutesLeft = totalRemainingWorkSessions * durationPerWorkSession;
-              
-              // Ajustement pour le temps déjà écoulé dans le cycle actuel
               if (isRunning && isWorkSession) {
                   const elapsed = (workTime * 60) - timeLeft;
                   minutesLeft -= (elapsed / 60);
               }
-              
               if (minutesLeft <= 0 && totalRemainingWorkSessions === 0) return "Terminé !";
-              
               const now = new Date();
               const endDate = new Date(now.getTime() + minutesLeft * 60000);
               return `Fin estimée : ${endDate.getHours().toString().padStart(2, '0')}h${endDate.getMinutes().toString().padStart(2, '0')}`;
@@ -468,7 +447,9 @@
                   pomodoroLives: localStorage.getItem('pomodoroLives'),
                   pomodoroXp: localStorage.getItem('pomodoroXp'),
                   pomodoroStreak: localStorage.getItem('pomodoroStreak'),
-                  pomodoroBadges: localStorage.getItem('pomodoroBadges')
+                  pomodoroBadges: localStorage.getItem('pomodoroBadges'),
+                  pomodoroMediaMode: localStorage.getItem('pomodoroMediaMode'),
+                  pomodoroCalendarEmail: localStorage.getItem('pomodoroCalendarEmail')
               };
               const blob = new Blob([JSON.stringify(data)], {type: "application/json"});
               const url = URL.createObjectURL(blob);
@@ -481,19 +462,14 @@
           const completeTask = (taskId, e) => {
             e.stopPropagation();
             const task = tasksInProgress.find(t => t.id === taskId); if (!task) return;
-            
             let finalCycles = task.spentCycles || 0;
-            if (activeTaskId === taskId && isWorkSession) {
-                finalCycles += 1;
-            }
-
+            if (activeTaskId === taskId && isWorkSession) { finalCycles += 1; }
             addXp(50 * Math.max(1, finalCycles)); 
             let newLives = lives;
             if (finalCycles < task.targetCycles) newLives = Math.min(lives + 1, 10);
             else if (finalCycles > task.targetCycles) newLives = Math.max(lives - 1, 0);
             setLives(newLives); localStorage.setItem('pomodoroLives', newLives);
             if (newLives === 0) { setShowGameOver(true); stopTimer(); }
-            
             const completedTask = { ...task, cycles: finalCycles, completedAt: new Date().toISOString() };
             const newCompletedTasks = [completedTask, ...completedTasks];
             setCompletedTasks(newCompletedTasks); localStorage.setItem('completedTasks', JSON.stringify(newCompletedTasks));
@@ -503,7 +479,7 @@
             setTaskStats(newStats); localStorage.setItem('taskStats', JSON.stringify(newStats));
             const newTasksInProgress = tasksInProgress.filter(t => t.id !== taskId);
             setTasksInProgress(newTasksInProgress); localStorage.setItem('tasksInProgress', JSON.stringify(newTasksInProgress));
-            if (activeTaskId === taskId) { setActiveTaskId(null); setIsRunning(false); if (playerRef.current && playerRef.current.pauseVideo) playerRef.current.pauseVideo(); }
+            if (activeTaskId === taskId) { setActiveTaskId(null); setIsRunning(false); if (mediaMode === 'video' && playerRef.current && playerRef.current.pauseVideo) playerRef.current.pauseVideo(); }
             checkBadges();
           };
 
@@ -526,9 +502,7 @@
           const clearAllCompletedTasks = () => { if (confirm("Effacer l'historique ?")) { setCompletedTasks([]); localStorage.setItem('completedTasks', '[]'); } };
           const deleteStat = (taskName) => { if (confirm(`Supprimer stats pour "${taskName}" ?`)) { const ns = { ...taskStats }; delete ns[taskName]; setTaskStats(ns); localStorage.setItem('taskStats', JSON.stringify(ns)); } };
           const restartGame = () => { setLives(5); localStorage.setItem('pomodoroLives', 5); setShowGameOver(false); };
-          
           const sendNotification = (title, body) => { if ("Notification" in window && Notification.permission === "granted") new Notification(title, { body: body, icon: "https://cdn-icons-png.flaticon.com/512/3209/3209965.png" }); };
-          
           const formatCycles = (c) => { const t = Math.floor(c/8), r = c%8; return t>0 ? `${t}T ${r}C` : `${r}C`; };
           const getTargetLabel = (c) => formatCycles(c);
           const formatTime = (s) => `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
@@ -543,6 +517,17 @@
           const secondaryBtnStyle = { backgroundColor: theme.secondary, color: '#FFFFFF', borderColor: theme.bg };
           const inputStyle = { backgroundColor: isDarkMode ? theme.bg : '#FFFFFF', borderColor: theme.border, color: theme.text };
           const mainBtnStyle = currentThemeKey === 'pokemon' ? primaryBtnTextBlack : primaryBtnStyle;
+
+          const changeMediaMode = (mode) => {
+              setMediaMode(mode);
+              localStorage.setItem('pomodoroMediaMode', mode);
+          };
+
+          const handleCalendarEmailChange = (e) => {
+              const val = e.target.value;
+              setCalendarEmail(val);
+              localStorage.setItem('pomodoroCalendarEmail', val);
+          };
 
           return (
             <div className="max-w-7xl mx-auto relative pb-10 transition-colors duration-500">
@@ -586,20 +571,47 @@
                 {/* --- COLONNE GAUCHE --- */}
                 <div className="space-y-6">
                   
-                  {/* VIDEO PLAYER */}
+                  {/* ESPACE FOCUS (Media) */}
                   <div className="p-8 rounded-3xl border-2" style={cardStyle}>
-                    <h2 className="text-xl font-semibold mb-4">Ambiance</h2>
-                    <div className="flex gap-3 mb-4">
-                      <input type="text" value={youtubeUrl} onChange={(e) => setYoutubeUrl(e.target.value)} placeholder="URL YouTube" className="flex-1 px-4 py-2 rounded-xl focus:outline-none border-2" style={inputStyle} />
-                      <button onClick={loadVideo} className="px-4 py-2 rounded-xl text-sm font-medium hover:opacity-90" style={mainBtnStyle}>Charger</button>
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-xl font-semibold">Espace Focus</h2>
+                        <div className="flex gap-2">
+                            <button onClick={() => changeMediaMode('video')} className={`px-3 py-1 rounded-lg text-xs font-bold transition ${mediaMode === 'video' ? 'opacity-100' : 'opacity-50'}`} style={mediaMode === 'video' ? primaryBtnStyle : secondaryBtnStyle}>🎥 Vidéo</button>
+                            <button onClick={() => changeMediaMode('calendar')} className={`px-3 py-1 rounded-lg text-xs font-bold transition ${mediaMode === 'calendar' ? 'opacity-100' : 'opacity-50'}`} style={mediaMode === 'calendar' ? primaryBtnStyle : secondaryBtnStyle}>📅 Agenda</button>
+                        </div>
                     </div>
-                    <div className="aspect-video bg-black rounded-2xl overflow-hidden border-2" style={{borderColor: theme.border}}>
-                      {videoId || isPlaylist ? ( isPlaylist ? <iframe className="w-full h-full" src={`https://www.youtube.com/embed/videoseries?list=${playlistId}&autoplay=0&controls=1&origin=${window.location.origin}`} allowFullScreen></iframe> : <div id="youtube-player" className="w-full h-full"></div> ) : <div className="w-full h-full flex items-center justify-center text-slate-400 text-sm">Vidéo ici</div>}
-                    </div>
+                    
+                    {mediaMode === 'video' ? (
+                        <>
+                            <div className="flex gap-3 mb-4">
+                              <input type="text" value={youtubeUrl} onChange={(e) => setYoutubeUrl(e.target.value)} placeholder="URL YouTube" className="flex-1 px-4 py-2 rounded-xl focus:outline-none border-2" style={inputStyle} />
+                              <button onClick={loadVideo} className="px-4 py-2 rounded-xl text-sm font-medium hover:opacity-90" style={mainBtnStyle}>Charger</button>
+                            </div>
+                            <div className="aspect-video bg-black rounded-2xl overflow-hidden border-2" style={{borderColor: theme.border}}>
+                              {videoId || isPlaylist ? ( isPlaylist ? <iframe className="w-full h-full" src={`https://www.youtube.com/embed/videoseries?list=${playlistId}&autoplay=0&controls=1&origin=${window.location.origin}`} allowFullScreen></iframe> : <div id="youtube-player" className="w-full h-full"></div> ) : <div className="w-full h-full flex items-center justify-center text-slate-400 text-sm">Vidéo ici</div>}
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                           <div className="flex gap-3 mb-4">
+                              <input type="text" value={calendarEmail} onChange={handleCalendarEmailChange} placeholder="votre.email@gmail.com (pour l'affichage)" className="flex-1 px-4 py-2 rounded-xl focus:outline-none border-2" style={inputStyle} />
+                           </div>
+                           <div className="aspect-video bg-white rounded-2xl overflow-hidden border-2 relative" style={{borderColor: theme.border}}>
+                               {calendarEmail ? (
+                                   <iframe src={`https://calendar.google.com/calendar/embed?src=${encodeURIComponent(calendarEmail)}&ctz=Europe%2FParis&mode=AGENDA&showTitle=0&showNav=1&showDate=1&showPrint=0&showTabs=0&showCalendars=0&showTz=0`} style={{border: 0}} width="100%" height="100%" frameBorder="0" scrolling="no"></iframe>
+                               ) : (
+                                   <div className="w-full h-full flex flex-col items-center justify-center text-center p-4">
+                                       <p className="text-slate-400 text-sm mb-2">Entrez votre email Google ci-dessus pour voir votre agenda.</p>
+                                       <p className="text-slate-500 text-xs italic">Note : Vous devez être connecté à ce compte Google dans ce navigateur.</p>
+                                   </div>
+                               )}
+                           </div>
+                        </>
+                    )}
                   </div>
 
-                  {/* VIDEO HISTORY */}
-                  {videoHistory.length > 0 && (
+                  {/* VIDEO HISTORY (Only visible if video mode and history exists) */}
+                  {mediaMode === 'video' && videoHistory.length > 0 && (
                     <div className="p-8 rounded-3xl border-2" style={cardStyle}>
                       <div className="flex justify-between items-center mb-6">
                         <h2 className="text-xl font-semibold">Historique Vidéos</h2>
