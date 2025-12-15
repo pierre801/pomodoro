@@ -5,8 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pomodoro Focus Timer</title>
     
-    <!-- C'EST ICI QUE CA SE PASSE : LE FAVICON -->
-    <!-- J'ai mis une tomate 🍅. Vous pouvez remplacer l'emoji par ce que vous voulez -->
+    <!-- FAVICON -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍅</text></svg>">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -40,10 +39,6 @@
         .calendar-icon { width: 14px; height: 14px; border: 2px solid currentColor; border-radius: 2px; position: relative; }
         .calendar-icon::before { content: ''; position: absolute; top: 2px; left: 0; right: 0; height: 1px; background-color: currentColor; }
         .calendar-icon::after { content: ''; position: absolute; top: -3px; left: 3px; width: 2px; height: 3px; background-color: currentColor; box-shadow: 4px 0 0 currentColor; }
-
-        /* Save Icon */
-        .save-icon { width: 14px; height: 14px; border: 2px solid currentColor; border-radius: 2px; position: relative; }
-        .save-icon::before { content: ''; position: absolute; top: 0; left: 3px; width: 4px; height: 4px; border: 1px solid currentColor; border-top: none; background: transparent; }
         
         @keyframes popIn { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
         .modal-animate { animation: popIn 0.3s ease-out forwards; }
@@ -78,13 +73,14 @@
             pastel: { name: "Douceur", day: { bg: "#FDF2F8", card: "#FFFFFF", text: "#4B5563", primary: "#F472B6", secondary: "#A78BFA", accent: "#34D399", border: "#FBCFE8" }, night: { bg: "#374151", card: "#4B5563", text: "#F3F4F6", primary: "#F472B6", secondary: "#A78BFA", accent: "#34D399", border: "#6B7280" } }
         };
 
+        // Note: durationMinutes est la durée CIBLE en minutes réelles (ex: 3h = 180min)
         const MARKETING_PRESETS = [
-            { name: "Publications semaine", duration: 12, label: "3h" },
-            { name: "Exemple de segmentation", duration: 12, label: "3h" },
-            { name: "Personal branding", duration: 12, label: "3h" },
-            { name: "Script vidéo", duration: 4, label: "1h" },
-            { name: "Tournage", duration: 4, label: "1h" },
-            { name: "Montage", duration: 16, label: "4h" },
+            { name: "Publications semaine", durationMinutes: 180, label: "3h" },
+            { name: "Exemple de segmentation", durationMinutes: 180, label: "3h" },
+            { name: "Personal branding", durationMinutes: 180, label: "3h" },
+            { name: "Script vidéo", durationMinutes: 60, label: "1h" },
+            { name: "Tournage", durationMinutes: 60, label: "1h" },
+            { name: "Montage", durationMinutes: 240, label: "4h" },
         ];
 
         const BADGES_DEF = [
@@ -119,11 +115,14 @@
           const [videoId, setVideoId] = useState('');
           const [isPlaylist, setIsPlaylist] = useState(false);
           const [playlistId, setPlaylistId] = useState('');
-          const [workTime, setWorkTime] = useState(25);
-          const [shortBreak, setShortBreak] = useState(5);
-          const [longBreak, setLongBreak] = useState(15);
-          const [timeLeft, setTimeLeft] = useState(25 * 60);
-          const [totalTimeForCurrentSession, setTotalTimeForCurrentSession] = useState(25 * 60);
+          
+          // Réglages par défaut : 30 min travail, 1 min pause (votre préférence)
+          const [workTime, setWorkTime] = useState(30);
+          const [shortBreak, setShortBreak] = useState(1);
+          const [longBreak, setLongBreak] = useState(20);
+          
+          const [timeLeft, setTimeLeft] = useState(30 * 60);
+          const [totalTimeForCurrentSession, setTotalTimeForCurrentSession] = useState(30 * 60);
           const [isRunning, setIsRunning] = useState(false);
           const [currentCycle, setCurrentCycle] = useState(1);
           const [isWorkSession, setIsWorkSession] = useState(true);
@@ -269,7 +268,7 @@
             let nextDuration = 0;
             
             if (isNextSessionWork) {
-                nextDuration = Math.max(60, workTime * 60); // Safety 1 min min
+                nextDuration = Math.max(60, workTime * 60); 
                 sendNotification("Au travail", "Concentration maximale !");
             } else {
                 const newPomodoros = todayPomodoros + 1;
@@ -306,8 +305,6 @@
                 setTimeLeft(nextDuration);
                 setTotalTimeForCurrentSession(nextDuration);
             } else {
-                // If pause is 0, we trigger next cycle immediately
-                // To avoid recursion depth issues in some browsers, we use setTimeout
                 setTimeout(() => handleCycleEnd(), 50); 
             }
             if (playerRef.current && playerRef.current.playVideo) playerRef.current.playVideo();
@@ -375,7 +372,29 @@
           const deleteFromHistory = (index) => { const newHistory = videoHistory.filter((_, i) => i !== index); setVideoHistory(newHistory); localStorage.setItem('pomodoroHistory', JSON.stringify(newHistory)); };
           const clearHistory = () => { setVideoHistory([]); localStorage.setItem('pomodoroHistory', '[]'); };
 
-          const handlePresetClick = (preset) => { setCurrentTask(preset.name); setTargetCycles(preset.duration); };
+          // --- LOGIQUE INTELLIGENTE DES PRESETS ---
+          const handlePresetClick = (preset) => { 
+              setCurrentTask(preset.name); 
+              
+              // CALCUL DYNAMIQUE : 
+              // 1 cycle "utilisateur" = workTime + (moyenne des pauses sur un tour complet)
+              // Moyenne pauses = (3 * shortBreak + 1 * longBreak) / 4
+              // Durée moyenne d'un bloc (Travail + Pause) = workTime + (3*S + L)/4
+              
+              const avgBreakTime = (shortBreak * 3 + longBreak) / 4;
+              const cycleDuration = workTime + avgBreakTime;
+              
+              // Combien de cycles pour atteindre l'objectif en minutes ?
+              // On multiplie par 2 car "targetCycles" compte les pas internes (Travail + Pause)
+              // Donc si je veux 60min et que mon cycle fait 30min, j'ai besoin de 2 sessions de travail.
+              // Chaque session de travail est suivie d'une pause, donc 2 sessions = 4 pas internes (T, P, T, P)
+              
+              const workSessionsNeeded = Math.ceil(preset.durationMinutes / cycleDuration);
+              const totalSteps = workSessionsNeeded * 2; 
+
+              setTargetCycles(totalSteps); 
+          };
+          
           const adjustTargetCycles = (amount) => { setTargetCycles(prev => { const newVal = prev + amount; return newVal < 2 ? 2 : newVal; }); };
           
           const startTask = () => {
@@ -391,32 +410,47 @@
           const activateTask = (taskId) => { setActiveTaskId(taskId); initAudio(); };
 
           const addToGoogleCalendar = (task) => {
-              const taskDurationMinutes = (task.targetCycles || 2) * 30; // Approx 30min per cycle
+              // Estimation durée pour agenda
+              const avgBreakTime = (shortBreak * 3 + longBreak) / 4;
+              const durationPerWorkSession = workTime + avgBreakTime;
+              const workSessions = Math.ceil(task.targetCycles / 2);
+              const totalDurationMin = workSessions * durationPerWorkSession;
+              
               const startDate = new Date();
-              const endDate = new Date(startDate.getTime() + taskDurationMinutes * 60000);
+              const endDate = new Date(startDate.getTime() + totalDurationMin * 60000);
               
               const formatDate = (date) => date.toISOString().replace(/-|:|\.\d\d\d/g, "");
               
-              const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(task.name)}&dates=${formatDate(startDate)}/${formatDate(endDate)}&details=${encodeURIComponent("Session Pomodoro - Temps visé : " + formatCycles(task.targetCycles))}&sf=true&output=xml`;
+              const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(task.name)}&dates=${formatDate(startDate)}/${formatDate(endDate)}&details=${encodeURIComponent("Session Pomodoro - Objectif : " + formatCycles(task.targetCycles))}&sf=true&output=xml`;
               
               window.open(url, '_blank');
           };
 
-          // ESTIMATION FIN DE JOURNEE
+          // ESTIMATION FIN DE JOURNEE DYNAMIQUE
           const getEstimatedEndTime = () => {
-              // Somme des cycles restants pour toutes les tâches en cours
-              let totalRemainingCycles = 0;
+              let totalRemainingWorkSessions = 0;
+              
               tasksInProgress.forEach(t => {
-                  const remaining = Math.max(0, (t.targetCycles || 0) - (t.spentCycles || 0));
-                  totalRemainingCycles += remaining;
+                  // Pas restants (T+P)
+                  const remainingSteps = Math.max(0, (t.targetCycles || 0) - (t.spentCycles || 0));
+                  // Nombre de sessions de travail restantes (1 session = 2 pas)
+                  const workSessions = Math.ceil(remainingSteps / 2);
+                  totalRemainingWorkSessions += workSessions;
               });
               
-              if (totalRemainingCycles === 0) return "Terminé !";
+              // Calcul précis avec les réglages actuels
+              const avgBreakTime = (shortBreak * 3 + longBreak) / 4;
+              const durationPerWorkSession = workTime + avgBreakTime;
               
-              // 1 cycle ~ (Work + Short Break avg) approx 30 mins, mais on peut être précis
-              // Cycle moyen = workTime + ((shortBreak * 3 + longBreak) / 4)
-              const avgCycleTime = workTime + ((shortBreak * 3 + longBreak) / 4);
-              const minutesLeft = totalRemainingCycles * avgCycleTime;
+              let minutesLeft = totalRemainingWorkSessions * durationPerWorkSession;
+              
+              // Ajustement pour le temps déjà écoulé dans le cycle actuel
+              if (isRunning && isWorkSession) {
+                  const elapsed = (workTime * 60) - timeLeft;
+                  minutesLeft -= (elapsed / 60);
+              }
+              
+              if (minutesLeft <= 0 && totalRemainingWorkSessions === 0) return "Terminé !";
               
               const now = new Date();
               const endDate = new Date(now.getTime() + minutesLeft * 60000);
