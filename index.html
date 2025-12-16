@@ -35,6 +35,14 @@
         .heart-icon { width: 24px; height: 24px; display: inline-block; }
         .heart-fill { fill: currentColor; } 
         .heart-empty { fill: transparent; stroke: currentColor; stroke-width: 2; }
+        /* Calendar Icon */
+        .calendar-icon { width: 14px; height: 14px; border: 2px solid currentColor; border-radius: 2px; position: relative; }
+        .calendar-icon::before { content: ''; position: absolute; top: 2px; left: 0; right: 0; height: 1px; background-color: currentColor; }
+        .calendar-icon::after { content: ''; position: absolute; top: -3px; left: 3px; width: 2px; height: 3px; background-color: currentColor; box-shadow: 4px 0 0 currentColor; }
+
+        /* Save Icon */
+        .save-icon { width: 14px; height: 14px; border: 2px solid currentColor; border-radius: 2px; position: relative; }
+        .save-icon::before { content: ''; position: absolute; top: 0; left: 3px; width: 4px; height: 4px; border: 1px solid currentColor; border-top: none; background: transparent; }
         
         @keyframes popIn { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
         .modal-animate { animation: popIn 0.3s ease-out forwards; }
@@ -280,17 +288,6 @@
                 localStorage.setItem('todayPomodoros', newPomodoros.toString());
                 addXp(100); 
                 
-                if (activeTaskId) {
-                    const updatedTasks = tasksInProgress.map(t => {
-                        if (t.id === activeTaskId) {
-                            return { ...t, spentCycles: (t.spentCycles || 0) + 1 };
-                        }
-                        return t;
-                    });
-                    setTasksInProgress(updatedTasks);
-                    localStorage.setItem('tasksInProgress', JSON.stringify(updatedTasks));
-                }
-
                 const today = new Date().toDateString();
                 const lastStreakDate = localStorage.getItem('lastStreakUpdateDate');
                 if (lastStreakDate !== today) {
@@ -303,6 +300,18 @@
                 
                 if (nextCycle === 8) { nextDuration = longBreak * 60; sendNotification("Pause Longue", "On souffle !"); }
                 else { nextDuration = shortBreak * 60; sendNotification("Pause Courte", "Petite pause."); }
+            }
+
+            // INCREMENTATION UNIVERSELLE DU CYCLE (TRAVAIL OU PAUSE)
+            if (activeTaskId) {
+                const updatedTasks = tasksInProgress.map(t => {
+                    if (t.id === activeTaskId) {
+                        return { ...t, spentCycles: (t.spentCycles || 0) + 1 };
+                    }
+                    return t;
+                });
+                setTasksInProgress(updatedTasks);
+                localStorage.setItem('tasksInProgress', JSON.stringify(updatedTasks));
             }
             
             if (nextDuration > 0) {
@@ -340,7 +349,8 @@
           };
           
           const stopTimer = () => {
-            if (activeTaskId && isWorkSession) {
+            // STOP MANUEL: On crédite le cycle entamé (que ce soit travail ou pause)
+            if (activeTaskId) {
                 const updatedTasks = tasksInProgress.map(t => {
                     if (t.id === activeTaskId) {
                         return { ...t, spentCycles: (t.spentCycles || 0) + 1 };
@@ -413,20 +423,28 @@
           };
 
           const getEstimatedEndTime = () => {
-              let totalRemainingWorkSessions = 0;
+              let totalRemainingSteps = 0;
               tasksInProgress.forEach(t => {
-                  const remainingSteps = Math.max(0, (t.targetCycles || 0) - (t.spentCycles || 0));
-                  const workSessions = Math.ceil(remainingSteps / 2);
-                  totalRemainingWorkSessions += workSessions;
+                  const remaining = Math.max(0, (t.targetCycles || 0) - (t.spentCycles || 0));
+                  totalRemainingSteps += remaining;
               });
-              const avgBreakTime = (shortBreak * 3 + longBreak) / 4;
-              const durationPerWorkSession = workTime + avgBreakTime;
-              let minutesLeft = totalRemainingWorkSessions * durationPerWorkSession;
-              if (isRunning && isWorkSession) {
-                  const elapsed = (workTime * 60) - timeLeft;
-                  minutesLeft -= (elapsed / 60);
+
+              // Durée moyenne d'un "Pas" (cycle ou pause)
+              // Un tour complet = 8 pas = 4 Travail + 3 Pause C + 1 Pause L
+              const totalTourTime = (4 * workTime) + (3 * shortBreak) + (1 * longBreak);
+              const avgStepTime = totalTourTime / 8;
+              
+              let minutesLeft = totalRemainingSteps * avgStepTime;
+              
+              if (isRunning) {
+                  // On soustrait le temps déjà écoulé dans le pas actuel
+                  const currentTotal = isWorkSession ? workTime : (currentCycle === 8 ? longBreak : shortBreak);
+                  const elapsed = currentTotal - (timeLeft / 60);
+                  minutesLeft -= elapsed;
               }
-              if (minutesLeft <= 0 && totalRemainingWorkSessions === 0) return "Terminé !";
+              
+              if (minutesLeft <= 0 && totalRemainingSteps === 0) return "Terminé !";
+              
               const now = new Date();
               const endDate = new Date(now.getTime() + minutesLeft * 60000);
               return `Fin estimée : ${endDate.getHours().toString().padStart(2, '0')}h${endDate.getMinutes().toString().padStart(2, '0')}`;
@@ -458,8 +476,11 @@
           const completeTask = (taskId, e) => {
             e.stopPropagation();
             const task = tasksInProgress.find(t => t.id === taskId); if (!task) return;
+            
             let finalCycles = task.spentCycles || 0;
-            if (activeTaskId === taskId && isWorkSession) { finalCycles += 1; }
+            // Si on finit manuellement et qu'on était actif, on compte le cycle en cours
+            if (activeTaskId === taskId) { finalCycles += 1; }
+            
             addXp(50 * Math.max(1, finalCycles)); 
             let newLives = lives;
             if (finalCycles < task.targetCycles) newLives = Math.min(lives + 1, 10);
