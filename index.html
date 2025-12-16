@@ -157,6 +157,10 @@
           const dragItem = useRef(null);
           const dragOverItem = useRef(null);
 
+          // REF POUR LE SYNC STATE (Important pour les closures)
+          const stateRef = useRef({ isRunning, activeTaskId });
+          stateRef.current = { isRunning, activeTaskId };
+
           const theme = THEMES[currentThemeKey][isDarkMode ? 'night' : 'day'];
 
           useEffect(() => {
@@ -205,6 +209,7 @@
 
           const changeTheme = (key) => { setCurrentThemeKey(key); localStorage.setItem('pomodoroTheme', key); };
           const toggleDarkMode = () => { const newMode = !isDarkMode; setIsDarkMode(newMode); localStorage.setItem('pomodoroDarkMode', newMode.toString()); };
+          
           const checkStreakValidity = (lastDate, currentStreak) => {
               if (!lastDate) return;
               const today = new Date().toDateString();
@@ -228,10 +233,41 @@
 
           useEffect(() => { document.title = isRunning ? `[${Math.floor(timeLeft / 60)}'] Pomodoro` : "Pomodoro Focus Timer"; }, [timeLeft, isRunning]);
 
+          // YOUTUBE EFFECT WITH SYNC
           useEffect(() => {
             if (mediaMode === 'video' && videoId && window.YT && window.YT.Player) {
               if (playerRef.current) try { playerRef.current.destroy(); } catch(e) {}
-              playerRef.current = new window.YT.Player('youtube-player', { videoId: videoId, playerVars: { autoplay: 0, controls: 1, origin: window.location.origin }, events: { onReady: (e) => { if (isRunning) e.target.playVideo(); } } });
+              playerRef.current = new window.YT.Player('youtube-player', { 
+                  videoId: videoId, 
+                  playerVars: { autoplay: 0, controls: 1, origin: window.location.origin }, 
+                  events: { 
+                      onReady: (e) => { 
+                          // Fix: Use e.target as reliable player ref
+                          playerRef.current = e.target;
+                          if (stateRef.current.isRunning) e.target.playVideo(); 
+                      },
+                      onStateChange: (e) => {
+                          // SYNC VIDEO -> TIMER
+                          if (e.data === window.YT.PlayerState.PLAYING) {
+                              // If video plays but timer stopped
+                              if (!stateRef.current.isRunning) {
+                                  if (stateRef.current.activeTaskId) {
+                                      setIsRunning(true);
+                                      initAudio();
+                                  } else {
+                                      e.target.pauseVideo();
+                                      alert("⚠️ Veuillez sélectionner une tâche avant de lancer la vidéo !");
+                                  }
+                              }
+                          } else if (e.data === window.YT.PlayerState.PAUSED) {
+                              // If video pauses and timer running
+                              if (stateRef.current.isRunning) {
+                                  setIsRunning(false);
+                              }
+                          }
+                      }
+                  } 
+              });
             }
           }, [videoId, mediaMode]);
 
@@ -288,6 +324,17 @@
                 localStorage.setItem('todayPomodoros', newPomodoros.toString());
                 addXp(100); 
                 
+                if (activeTaskId) {
+                    const updatedTasks = tasksInProgress.map(t => {
+                        if (t.id === activeTaskId) {
+                            return { ...t, spentCycles: (t.spentCycles || 0) + 1 };
+                        }
+                        return t;
+                    });
+                    setTasksInProgress(updatedTasks);
+                    localStorage.setItem('tasksInProgress', JSON.stringify(updatedTasks));
+                }
+
                 const today = new Date().toDateString();
                 const lastStreakDate = localStorage.getItem('lastStreakUpdateDate');
                 if (lastStreakDate !== today) {
@@ -302,7 +349,7 @@
                 else { nextDuration = shortBreak * 60; sendNotification("Pause Courte", "Petite pause."); }
             }
 
-            // INCREMENTATION UNIVERSELLE DU CYCLE (TRAVAIL OU PAUSE)
+            // INCREMENT CYCLE COUNT FOR ACTIVE TASK
             if (activeTaskId) {
                 const updatedTasks = tasksInProgress.map(t => {
                     if (t.id === activeTaskId) {
@@ -320,7 +367,13 @@
             } else {
                 setTimeout(() => handleCycleEnd(), 50); 
             }
-            if (mediaMode === 'video' && playerRef.current && playerRef.current.playVideo) playerRef.current.playVideo();
+            // If linked, video continues playing
+            if (mediaMode === 'video' && playerRef.current && typeof playerRef.current.playVideo === 'function') {
+                // Ensure it plays
+                if (playerRef.current.getPlayerState && playerRef.current.getPlayerState() !== 1) {
+                     playerRef.current.playVideo();
+                }
+            }
           };
 
           useEffect(() => {
@@ -344,13 +397,18 @@
           const toggleTimer = () => {
             if (!activeTaskId && !isRunning) { alert("⚠️ Sélectionnez une tâche pour commencer !"); return; }
             initAudio(); 
-            const newRunningState = !isRunning; setIsRunning(newRunningState);
-            if (mediaMode === 'video' && playerRef.current) { if (newRunningState && playerRef.current.playVideo) playerRef.current.playVideo(); else if (!newRunningState && playerRef.current.pauseVideo) playerRef.current.pauseVideo(); }
+            const newRunningState = !isRunning; 
+            setIsRunning(newRunningState);
+            
+            // Sync Video on Manual Toggle
+            if (mediaMode === 'video' && playerRef.current && typeof playerRef.current.playVideo === 'function') { 
+                if (newRunningState) playerRef.current.playVideo(); 
+                else playerRef.current.pauseVideo(); 
+            }
           };
           
           const stopTimer = () => {
-            // STOP MANUEL: On crédite le cycle entamé (que ce soit travail ou pause)
-            if (activeTaskId) {
+            if (activeTaskId && isWorkSession) {
                 const updatedTasks = tasksInProgress.map(t => {
                     if (t.id === activeTaskId) {
                         return { ...t, spentCycles: (t.spentCycles || 0) + 1 };
@@ -366,13 +424,18 @@
             const t = Math.max(60, workTime * 60); 
             setTimeLeft(t); setTotalTimeForCurrentSession(t);
             setActiveTaskId(null);
-            if (mediaMode === 'video' && playerRef.current && playerRef.current.pauseVideo) playerRef.current.pauseVideo();
+            
+            if (mediaMode === 'video' && playerRef.current && typeof playerRef.current.pauseVideo === 'function') {
+                playerRef.current.pauseVideo();
+            }
           };
           
           const resetTimer = () => {
             setIsRunning(false); setCurrentCycle(1); setIsWorkSession(true);
             const t = Math.max(60, workTime * 60); setTimeLeft(t); setTotalTimeForCurrentSession(t);
-            if (mediaMode === 'video' && playerRef.current && playerRef.current.pauseVideo) playerRef.current.pauseVideo();
+            if (mediaMode === 'video' && playerRef.current && typeof playerRef.current.pauseVideo === 'function') {
+                playerRef.current.pauseVideo();
+            }
           };
 
           const extractVideoId = (url) => {
@@ -404,7 +467,7 @@
             setTasksInProgress([...tasksInProgress, newTask]); localStorage.setItem('tasksInProgress', JSON.stringify([...tasksInProgress, newTask]));
             setActiveTaskId(newTask.id); setCurrentCycle(1); setIsWorkSession(true); setCurrentTask(''); setIsRunning(true);
             const t = Math.max(60, workTime * 60); setTotalTimeForCurrentSession(t); setTimeLeft(t);
-            if (mediaMode === 'video' && playerRef.current && playerRef.current.playVideo) playerRef.current.playVideo();
+            if (mediaMode === 'video' && playerRef.current && typeof playerRef.current.playVideo === 'function') playerRef.current.playVideo();
           };
 
           const activateTask = (taskId) => { setActiveTaskId(taskId); initAudio(); };
@@ -429,25 +492,33 @@
                   totalRemainingSteps += remaining;
               });
 
-              // Durée moyenne d'un "Pas" (cycle ou pause)
-              // Un tour complet = 8 pas = 4 Travail + 3 Pause C + 1 Pause L
-              const totalTourTime = (4 * workTime) + (3 * shortBreak) + (1 * longBreak);
-              const avgStepTime = totalTourTime / 8;
-              
-              let minutesLeft = totalRemainingSteps * avgStepTime;
-              
+              if (totalRemainingSteps === 0) return "Terminé !";
+
+              let minutesNeeded = 0;
               if (isRunning) {
-                  // On soustrait le temps déjà écoulé dans le pas actuel
-                  const currentTotal = isWorkSession ? workTime : (currentCycle === 8 ? longBreak : shortBreak);
-                  const elapsed = currentTotal - (timeLeft / 60);
-                  minutesLeft -= elapsed;
+                  minutesNeeded += timeLeft / 60;
+                  totalRemainingSteps -= 1;
+              }
+
+              let simCycle = currentCycle;
+
+              while (totalRemainingSteps > 0) {
+                  simCycle++;
+                  if (simCycle > 8) simCycle = 1;
+                  
+                  if (simCycle % 2 !== 0) {
+                      minutesNeeded += workTime;
+                  } else if (simCycle === 8) {
+                      minutesNeeded += longBreak;
+                  } else {
+                      minutesNeeded += shortBreak;
+                  }
+                  totalRemainingSteps--;
               }
               
-              if (minutesLeft <= 0 && totalRemainingSteps === 0) return "Terminé !";
-              
               const now = new Date();
-              const endDate = new Date(now.getTime() + minutesLeft * 60000);
-              return `Fin estimée : ${endDate.getHours().toString().padStart(2, '0')}h${endDate.getMinutes().toString().padStart(2, '0')}`;
+              const endDate = new Date(now.getTime() + minutesNeeded * 60000);
+              return `Fin : ${endDate.getHours().toString().padStart(2, '0')}h${endDate.getMinutes().toString().padStart(2, '0')}`;
           };
 
           const exportData = () => {
@@ -476,11 +547,8 @@
           const completeTask = (taskId, e) => {
             e.stopPropagation();
             const task = tasksInProgress.find(t => t.id === taskId); if (!task) return;
-            
             let finalCycles = task.spentCycles || 0;
-            // Si on finit manuellement et qu'on était actif, on compte le cycle en cours
             if (activeTaskId === taskId) { finalCycles += 1; }
-            
             addXp(50 * Math.max(1, finalCycles)); 
             let newLives = lives;
             if (finalCycles < task.targetCycles) newLives = Math.min(lives + 1, 10);
@@ -496,7 +564,11 @@
             setTaskStats(newStats); localStorage.setItem('taskStats', JSON.stringify(newStats));
             const newTasksInProgress = tasksInProgress.filter(t => t.id !== taskId);
             setTasksInProgress(newTasksInProgress); localStorage.setItem('tasksInProgress', JSON.stringify(newTasksInProgress));
-            if (activeTaskId === taskId) { setActiveTaskId(null); setIsRunning(false); if (mediaMode === 'video' && playerRef.current && playerRef.current.pauseVideo) playerRef.current.pauseVideo(); }
+            if (activeTaskId === taskId) { 
+                setActiveTaskId(null); 
+                setIsRunning(false); 
+                if (mediaMode === 'video' && playerRef.current && typeof playerRef.current.pauseVideo === 'function') playerRef.current.pauseVideo(); 
+            }
             checkBadges();
           };
 
@@ -535,16 +607,8 @@
           const inputStyle = { backgroundColor: isDarkMode ? theme.bg : '#FFFFFF', borderColor: theme.border, color: theme.text };
           const mainBtnStyle = currentThemeKey === 'pokemon' ? primaryBtnTextBlack : primaryBtnStyle;
 
-          const changeMediaMode = (mode) => {
-              setMediaMode(mode);
-              localStorage.setItem('pomodoroMediaMode', mode);
-          };
-
-          const handleCalendarEmailChange = (e) => {
-              const val = e.target.value;
-              setCalendarEmail(val);
-              localStorage.setItem('pomodoroCalendarEmail', val);
-          };
+          const changeMediaMode = (mode) => { setMediaMode(mode); localStorage.setItem('pomodoroMediaMode', mode); };
+          const handleCalendarEmailChange = (e) => { const val = e.target.value; setCalendarEmail(val); localStorage.setItem('pomodoroCalendarEmail', val); };
 
           return (
             <div className="max-w-7xl mx-auto relative pb-10 transition-colors duration-500">
@@ -561,7 +625,6 @@
                       </div>
                   </div>
               </div>
-
               {showGameOver && (
                   <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
                       <div className="p-8 rounded-3xl border-4 max-w-lg w-full text-center modal-animate shadow-2xl" style={{backgroundColor: theme.card, borderColor: theme.primary}}>
@@ -571,7 +634,6 @@
                       </div>
                   </div>
               )}
-
               <div className="mb-8 w-full overflow-x-auto hide-scrollbar">
                 <div className="flex gap-4 min-w-max pb-2">
                     {MARKETING_PRESETS.map((preset, idx) => (
@@ -582,13 +644,8 @@
                     ))}
                 </div>
               </div>
-
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                
-                {/* --- COLONNE GAUCHE --- */}
                 <div className="space-y-6">
-                  
-                  {/* ESPACE FOCUS (Media) */}
                   <div className="p-8 rounded-3xl border-2" style={cardStyle}>
                     <div className="flex justify-between items-center mb-4">
                         <h2 className="text-xl font-semibold">Espace Focus</h2>
@@ -597,7 +654,6 @@
                             <button onClick={() => changeMediaMode('calendar')} className={`px-3 py-1 rounded-lg text-xs font-bold transition ${mediaMode === 'calendar' ? 'opacity-100' : 'opacity-50'}`} style={mediaMode === 'calendar' ? primaryBtnStyle : secondaryBtnStyle}>📅 Agenda</button>
                         </div>
                     </div>
-                    
                     {mediaMode === 'video' ? (
                         <>
                             <div className="flex gap-3 mb-4">
@@ -611,7 +667,7 @@
                     ) : (
                         <>
                            <div className="flex gap-3 mb-4">
-                              <input type="text" value={calendarEmail} onChange={handleCalendarEmailChange} placeholder="votre.email@gmail.com (pour l'affichage)" className="flex-1 px-4 py-2 rounded-xl focus:outline-none border-2" style={inputStyle} />
+                              <input type="text" value={calendarEmail} onChange={handleCalendarEmailChange} placeholder="votre.email@gmail.com" className="flex-1 px-4 py-2 rounded-xl focus:outline-none border-2" style={inputStyle} />
                            </div>
                            <div className="aspect-video bg-white rounded-2xl overflow-hidden border-2 relative" style={{borderColor: theme.border}}>
                                {calendarEmail ? (
@@ -626,8 +682,6 @@
                         </>
                     )}
                   </div>
-
-                  {/* VIDEO HISTORY (Only visible if video mode and history exists) */}
                   {mediaMode === 'video' && videoHistory.length > 0 && (
                     <div className="p-8 rounded-3xl border-2" style={cardStyle}>
                       <div className="flex justify-between items-center mb-6">
@@ -644,8 +698,6 @@
                       </div>
                     </div>
                   )}
-
-                  {/* EN COURS */}
                   {tasksInProgress.length > 0 && (
                     <div className="p-8 rounded-3xl border-2" style={cardStyle}>
                       <div className="flex justify-between items-center mb-4">
@@ -686,8 +738,6 @@
                       </div>
                     </div>
                   )}
-
-                  {/* HISTORIQUE TACHES + STATS */}
                   {completedTasks.length > 0 && (
                     <div className="p-8 rounded-3xl border-2" style={cardStyle}>
                       <div className="flex justify-between items-center mb-4">
@@ -715,7 +765,6 @@
                       </div>
                     </div>
                   )}
-                  
                   {Object.keys(taskStats).length > 0 && (
                     <div className="p-8 rounded-3xl border-2" style={cardStyle}>
                         <h2 className="text-xl font-semibold mb-4">Statistiques</h2>
@@ -733,11 +782,7 @@
                     </div>
                   )}
                 </div>
-
-                {/* --- COLONNE DROITE --- */}
                 <div className="space-y-6">
-                  
-                  {/* TIMER COMPRESSED */}
                   <div className="p-6 rounded-3xl border-2 text-center relative overflow-visible" style={cardStyle}>
                     <div className="mb-2"><span className="text-sm font-medium opacity-70">{isWorkSession ? 'Session de travail' : 'Pause'} • Cycle {currentCycle}/8</span></div>
                     <div className="relative w-48 h-48 mx-auto mb-6 flex items-center justify-center">
@@ -755,46 +800,22 @@
                       Aujourd'hui : {todayPomodoros} pomodoro{todayPomodoros > 1 ? 's' : ''} ({Math.floor(todayMinutes / 60)}h {todayMinutes % 60}m)
                     </div>
                   </div>
-                  
-                  {/* REGLAGES + THEMES */}
                   <div className="p-8 rounded-3xl border-2" style={cardStyle}>
                     <div className="flex justify-between items-center mb-4">
                         <h2 className="text-xl font-semibold">Réglages</h2>
                         <button onClick={exportData} className="text-xs px-2 py-1 rounded border hover:opacity-80" style={{borderColor: theme.text, color: theme.text}}>💾 Sauvegarder</button>
                     </div>
-                    
-                    {/* Theme Selector */}
                     <div className="flex justify-between items-center mb-6 p-2 rounded-xl bg-opacity-10 bg-slate-500">
                         <div className="flex gap-2">
                             {Object.keys(THEMES).map(key => (
-                                <button 
-                                    key={key} 
-                                    onClick={() => changeTheme(key)}
-                                    className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${currentThemeKey === key ? 'ring-2 ring-offset-2 ring-current scale-110' : ''}`}
-                                    style={{backgroundColor: THEMES[key].day.primary, borderColor: THEMES[key].day.secondary}}
-                                    title={THEMES[key].name}
-                                ></button>
+                                <button key={key} onClick={() => changeTheme(key)} className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${currentThemeKey === key ? 'ring-2 ring-offset-2 ring-current scale-110' : ''}`} style={{backgroundColor: THEMES[key].day.primary, borderColor: THEMES[key].day.secondary}} title={THEMES[key].name}></button>
                             ))}
                         </div>
-                        
-                        {/* iOS Switch Day/Night */}
-                        <div 
-                            className="relative w-14 h-8 rounded-full cursor-pointer transition-colors duration-300 flex items-center px-1"
-                            style={{backgroundColor: isDarkMode ? '#4B5563' : '#93C5FD'}}
-                            onClick={toggleDarkMode}
-                        >
-                            {/* Icons inside track */}
-                            <span className="absolute left-1.5 text-xs">☀️</span>
-                            <span className="absolute right-1.5 text-xs">🌙</span>
-                            
-                            {/* Thumb */}
-                            <div 
-                                className="w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 z-10"
-                                style={{transform: isDarkMode ? 'translateX(24px)' : 'translateX(0)'}}
-                            ></div>
+                        <div className="relative w-14 h-8 rounded-full cursor-pointer transition-colors duration-300 flex items-center px-1" style={{backgroundColor: isDarkMode ? '#4B5563' : '#93C5FD'}} onClick={toggleDarkMode}>
+                            <span className="absolute left-1.5 text-xs">☀️</span><span className="absolute right-1.5 text-xs">🌙</span>
+                            <div className="w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 z-10" style={{transform: isDarkMode ? 'translateX(24px)' : 'translateX(0)'}}></div>
                         </div>
                     </div>
-
                     <div className="grid grid-cols-3 gap-3 mb-6">
                         <div><label className="block text-xs font-medium mb-1 opacity-70">Travail</label><input type="number" value={workTime} onChange={(e) => { let v = Math.max(1, Math.min(60, parseInt(e.target.value)||1)); setWorkTime(v); if (isWorkSession && !isRunning) { setTimeLeft(v*60); setTotalTimeForCurrentSession(v*60); }}} className="w-full px-2 py-2 border-2 rounded-xl text-center focus:outline-none" style={inputStyle} min="1" max="60"/></div>
                         <div><label className="block text-xs font-medium mb-1 opacity-70">P. Courte</label><input type="number" value={shortBreak} onChange={(e) => setShortBreak(Math.max(0, Math.min(60, parseInt(e.target.value)||0)))} className="w-full px-2 py-2 border-2 rounded-xl text-center focus:outline-none" style={inputStyle} min="0" max="60"/></div>
@@ -802,8 +823,6 @@
                     </div>
                     <div><label className="block text-xs font-medium mb-1 opacity-70">Volume ({Math.round(volume * 100)}%)</label><input type="range" min="0" max="1" step="0.1" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} className="w-full h-2 rounded-lg appearance-none cursor-pointer" style={{accentColor: theme.primary, backgroundColor: theme.border}}/></div>
                   </div>
-
-                  {/* NEW TASK */}
                   <div className="p-8 rounded-3xl border-2" style={cardStyle}>
                     <h2 className="text-xl font-semibold mb-4">Nouvelle tâche</h2>
                     <div className="space-y-4">
@@ -819,8 +838,6 @@
                       <button onClick={startTask} disabled={!currentTask.trim()} className="w-full px-5 py-3 text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-2xl font-medium transition border-2 hover:opacity-90" style={mainBtnStyle}>GO !</button>
                     </div>
                   </div>
-
-                  {/* SUCCES (BADGES) */}
                   <div className="p-8 rounded-3xl border-2" style={cardStyle}>
                       <h2 className="text-xl font-semibold mb-4">Succès</h2>
                       <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
