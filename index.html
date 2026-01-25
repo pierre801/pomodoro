@@ -742,10 +742,6 @@
                       </div>
                   </div>
                   
-                  {/* Flèche scroll hint */}
-                  <div className="absolute bottom-8 animate-bounce">
-                      <div className="text-5xl opacity-50" style={{color: theme.text}}>↓</div>
-                  </div>
               </div>
               
               {/* CONTENU SCROLLABLE - 2 COLONNES */}
@@ -893,23 +889,6 @@
                           </div>
                         ))}
                       </div>
-                    </div>
-                  )}
-                  
-                  {Object.keys(taskStats).length > 0 && (
-                    <div className="p-8 rounded-3xl border-2" style={cardStyle}>
-                        <h2 className="text-xl font-semibold mb-4">Statistiques</h2>
-                        <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
-                            {Object.entries(taskStats).map(([taskName, stats]) => (
-                                <div key={taskName} className="p-3 rounded-xl border-2 flex justify-between items-center text-sm" style={{...inputStyle, backgroundColor: isDarkMode ? theme.bg : '#FFFFFF'}}>
-                                    <span className="font-medium truncate flex-1 pr-2">{taskName}</span>
-                                    <div className="flex items-center gap-3">
-                                        <span className="opacity-70">Moy. {formatCycles(getAverageTime(taskName))}</span>
-                                        <button onClick={() => deleteStat(taskName)} className="opacity-50 hover:opacity-100 hover:text-red-500"><div className="trash-icon"></div></button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
                     </div>
                   )}
                 </div>
