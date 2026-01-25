@@ -57,30 +57,103 @@
         .checkbox-custom:checked::after { content: '✓'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 14px; font-weight: bold; color: currentColor; }
         .subtask-completed { opacity: 0.5; text-decoration: line-through; }
         
-        /* Fond animé pixel art */
-        @keyframes pixelScroll {
+        /* Fond pixel art qui défile - Style paysage rétro */
+        @keyframes pixelPan {
             0% { background-position: 0 0; }
-            100% { background-position: 40px 40px; }
+            100% { background-position: 800px 0; }
         }
         .pixel-bg {
-            background-image: 
-                linear-gradient(45deg, rgba(0,0,0,0.03) 25%, transparent 25%),
-                linear-gradient(-45deg, rgba(0,0,0,0.03) 25%, transparent 25%),
-                linear-gradient(45deg, transparent 75%, rgba(0,0,0,0.03) 75%),
-                linear-gradient(-45deg, transparent 75%, rgba(0,0,0,0.03) 75%);
-            background-size: 40px 40px;
-            background-position: 0 0, 0 20px, 20px -20px, -20px 0px;
-            animation: pixelScroll 8s linear infinite;
+            background: 
+                linear-gradient(180deg, 
+                    #b89c7d 0%, 
+                    #d4a574 15%,
+                    #e8b98a 25%,
+                    #f5cfa0 35%,
+                    #fae4c6 50%,
+                    #9ab06d 50%,
+                    #7d9654 70%,
+                    #6b8447 100%
+                );
+            position: relative;
+        }
+        .pixel-bg::before {
+            content: '';
+            position: absolute;
+            top: 35%;
+            left: 0;
+            right: 0;
+            height: 15%;
+            background: repeating-linear-gradient(
+                90deg,
+                #d4a574 0px,
+                #d4a574 2px,
+                transparent 2px,
+                transparent 4px
+            );
+            animation: pixelPan 20s linear infinite;
+        }
+        .pixel-bg::after {
+            content: '';
+            position: absolute;
+            top: 15%;
+            left: 0;
+            right: 0;
+            height: 20%;
+            background: 
+                radial-gradient(ellipse 60px 40px at 10% 50%, #fff5e6 40%, transparent 70%),
+                radial-gradient(ellipse 80px 50px at 30% 60%, #fff5e6 40%, transparent 70%),
+                radial-gradient(ellipse 70px 45px at 50% 55%, #fff5e6 40%, transparent 70%),
+                radial-gradient(ellipse 90px 55px at 70% 50%, #fff5e6 40%, transparent 70%),
+                radial-gradient(ellipse 75px 48px at 85% 58%, #fff5e6 40%, transparent 70%);
+            opacity: 0.6;
+            animation: pixelPan 40s linear infinite;
         }
         .pixel-bg-dark {
-            background-image: 
-                linear-gradient(45deg, rgba(255,255,255,0.02) 25%, transparent 25%),
-                linear-gradient(-45deg, rgba(255,255,255,0.02) 25%, transparent 25%),
-                linear-gradient(45deg, transparent 75%, rgba(255,255,255,0.02) 75%),
-                linear-gradient(-45deg, transparent 75%, rgba(255,255,255,0.02) 75%);
-            background-size: 40px 40px;
-            background-position: 0 0, 0 20px, 20px -20px, -20px 0px;
-            animation: pixelScroll 8s linear infinite;
+            background: 
+                linear-gradient(180deg, 
+                    #3d2d1f 0%, 
+                    #5a4229 15%,
+                    #6e5433 25%,
+                    #7d6140 35%,
+                    #8a6f4d 50%,
+                    #3d4a2a 50%,
+                    #2d3920 70%,
+                    #1f2916 100%
+                );
+            position: relative;
+        }
+        .pixel-bg-dark::before {
+            content: '';
+            position: absolute;
+            top: 35%;
+            left: 0;
+            right: 0;
+            height: 15%;
+            background: repeating-linear-gradient(
+                90deg,
+                #5a4229 0px,
+                #5a4229 2px,
+                transparent 2px,
+                transparent 4px
+            );
+            animation: pixelPan 20s linear infinite;
+            opacity: 0.7;
+        }
+        .pixel-bg-dark::after {
+            content: '';
+            position: absolute;
+            top: 15%;
+            left: 0;
+            right: 0;
+            height: 20%;
+            background: 
+                radial-gradient(ellipse 60px 40px at 10% 50%, #4a3d2d 40%, transparent 70%),
+                radial-gradient(ellipse 80px 50px at 30% 60%, #4a3d2d 40%, transparent 70%),
+                radial-gradient(ellipse 70px 45px at 50% 55%, #4a3d2d 40%, transparent 70%),
+                radial-gradient(ellipse 90px 55px at 70% 50%, #4a3d2d 40%, transparent 70%),
+                radial-gradient(ellipse 75px 48px at 85% 58%, #4a3d2d 40%, transparent 70%);
+            opacity: 0.3;
+            animation: pixelPan 40s linear infinite;
         }
     </style>
 </head>
