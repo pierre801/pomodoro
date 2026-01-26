@@ -303,23 +303,13 @@
 
           const handleCycleEnd = () => {
             playBellSound();
-            let nextCycle = currentCycle + 1;
-            if (currentCycle >= 8) nextCycle = 1;
-            setCurrentCycle(nextCycle);
             
-            const isNextSessionWork = (nextCycle % 2 !== 0);
-            setIsWorkSession(isNextSessionWork);
-            
-            let nextDuration = 0;
-            
-            if (isNextSessionWork) {
-                nextDuration = Math.max(60, workTime * 60); 
-                sendNotification("Au travail", "Concentration maximale !");
-            } else {
+            if (isWorkSession) {
+                // Fin d'une session de travail
                 const newPomodoros = todayPomodoros + 1;
                 setTodayPomodoros(newPomodoros);
                 localStorage.setItem('todayPomodoros', newPomodoros.toString());
-                addXp(100); 
+                addXp(100);
                 
                 if (activeTaskId) {
                     const updatedTasks = tasksInProgress.map(t => {
@@ -342,15 +332,32 @@
                 checkBadges();
                 checkDailyReset();
                 
-                if (nextCycle === 8) { nextDuration = longBreak * 60; sendNotification("Pause Longue", "On souffle !"); }
-                else { nextDuration = shortBreak * 60; sendNotification("Pause Courte", "Petite pause."); }
-            }
-            
-            if (nextDuration > 0) {
+                // Incrémenter le cycle et passer en pause
+                let nextCycle = currentCycle + 1;
+                if (nextCycle > 4) nextCycle = 1;
+                setCurrentCycle(nextCycle);
+                
+                // Décider si pause courte ou longue
+                let nextDuration = 0;
+                if (nextCycle === 1) {
+                    // Après le 4ème cycle, pause longue puis reset
+                    nextDuration = longBreak * 60;
+                    sendNotification("Pause Longue", "On souffle !");
+                } else {
+                    nextDuration = shortBreak * 60;
+                    sendNotification("Pause Courte", "Petite pause.");
+                }
+                
+                setIsWorkSession(false);
                 setTimeLeft(nextDuration);
                 setTotalTimeForCurrentSession(nextDuration);
             } else {
-                setTimeout(() => handleCycleEnd(), 50); 
+                // Fin d'une pause, retour au travail
+                const nextDuration = Math.max(60, workTime * 60);
+                setIsWorkSession(true);
+                setTimeLeft(nextDuration);
+                setTotalTimeForCurrentSession(nextDuration);
+                sendNotification("Au travail", "Concentration maximale !");
             }
             
             if (mediaMode === 'video' && playerRef.current && typeof playerRef.current.playVideo === 'function') {
@@ -556,17 +563,21 @@
               let simCycle = currentCycle;
 
               while (totalRemainingSteps > 0) {
-                  simCycle++;
-                  if (simCycle > 8) simCycle = 1;
-                  
-                  if (simCycle % 2 !== 0) {
-                      minutesNeeded += workTime;
-                  } else if (simCycle === 8) {
-                      minutesNeeded += longBreak;
-                  } else {
-                      minutesNeeded += shortBreak;
-                  }
+                  // Ajouter une session de travail
+                  minutesNeeded += workTime;
                   totalRemainingSteps--;
+                  
+                  if (totalRemainingSteps > 0) {
+                      // Ajouter une pause après le travail
+                      simCycle++;
+                      if (simCycle > 4) simCycle = 1;
+                      
+                      if (simCycle === 1) {
+                          minutesNeeded += longBreak;
+                      } else {
+                          minutesNeeded += shortBreak;
+                      }
+                  }
               }
               
               const now = new Date();
@@ -736,7 +747,7 @@
                           
                           {/* Cycle */}
                           <div className="text-center text-3xl font-bold opacity-70" style={{color: theme.text}}>
-                              Cycle {currentCycle}/8
+                              Cycle {currentCycle}/4
                           </div>
                           
                           {/* Boutons de contrôle */}
