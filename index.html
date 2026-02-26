@@ -455,7 +455,7 @@
           const deleteFromHistory = (index) => { const newHistory = videoHistory.filter((_, i) => i !== index); setVideoHistory(newHistory); localStorage.setItem('pomodoroHistory', JSON.stringify(newHistory)); };
           const clearHistory = () => { setVideoHistory([]); localStorage.setItem('pomodoroHistory', '[]'); };
 
-          const adjustTargetCycles = (amount) => { setTargetCycles(prev => { const newVal = prev + amount; return newVal < 2 ? 2 : newVal; }); };
+          const adjustTargetCycles = (amount) => { setTargetCycles(prev => { const newVal = prev + amount; return newVal < 1 ? 1 : newVal; }); };
           
           const addSubtask = () => {
               if (!newSubtaskName.trim()) return;
@@ -982,9 +982,9 @@
                           <div className="rounded-2xl p-3 flex flex-col items-center border-2" style={{...inputStyle, backgroundColor: isDarkMode ? theme.bg : '#FFFFFF'}}>
                               <label className="text-xs font-medium opacity-50 mb-2">Objectif (Temps visé)</label>
                               <div className="flex items-center gap-4 w-full justify-between px-2">
-                                  <button onClick={() => adjustTargetCycles(-2)} className="w-10 h-10 flex items-center justify-center border-2 rounded-xl hover:opacity-70 transition" style={{borderColor: theme.border}}><div className="w-3 h-1 bg-current rounded-sm"></div></button>
+                                  <button onClick={() => adjustTargetCycles(-1)} className="w-10 h-10 flex items-center justify-center border-2 rounded-xl hover:opacity-70 transition" style={{borderColor: theme.border}}><div className="w-3 h-1 bg-current rounded-sm"></div></button>
                                   <div className="text-lg font-bold">{getTargetLabel(targetCycles)}</div>
-                                  <button onClick={() => adjustTargetCycles(2)} className="w-10 h-10 flex items-center justify-center border-2 rounded-xl hover:opacity-70 transition relative" style={{borderColor: theme.border}}><div className="absolute w-3 h-1 bg-current rounded-sm"></div><div className="absolute w-1 h-3 bg-current rounded-sm"></div></button>
+                                  <button onClick={() => adjustTargetCycles(1)} className="w-10 h-10 flex items-center justify-center border-2 rounded-xl hover:opacity-70 transition relative" style={{borderColor: theme.border}}><div className="absolute w-3 h-1 bg-current rounded-sm"></div><div className="absolute w-1 h-3 bg-current rounded-sm"></div></button>
                               </div>
                           </div>
                       )}
