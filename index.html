@@ -402,7 +402,6 @@
           }, [isRunning, timeLeft]);
 
           const toggleTimer = () => {
-            if (!activeTaskId && !isRunning) { alert("⚠️ Sélectionnez une tâche pour commencer !"); return; }
             initAudio(); 
             const newRunningState = !isRunning; 
             setIsRunning(newRunningState);
