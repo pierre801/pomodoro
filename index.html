@@ -147,6 +147,7 @@
           const [isRunning, setIsRunning] = useState(false);
           const [currentCycle, setCurrentCycle] = useState(1);
           const [isWorkSession, setIsWorkSession] = useState(true);
+          const [lastUpdateTime, setLastUpdateTime] = useState(Date.now());
           const [videoHistory, setVideoHistory] = useState([]);
           const [todayPomodoros, setTodayPomodoros] = useState(0);
           const [lastResetDate, setLastResetDate] = useState('');
@@ -382,27 +383,35 @@
                 }
             }
           };
-
           useEffect(() => {
             let interval = null;
-            if (isRunning) {
-                if (timeLeft === 0) {
-                    handleCycleEnd();
-                } else {
-                    interval = setInterval(() => {
+            
+            if (isRunning && timeLeft > 0) {
+                setLastUpdateTime(Date.now());
+                
+                interval = setInterval(() => {
+                    const now = Date.now();
+                    const elapsed = Math.floor((now - lastUpdateTime) / 1000);
+                    
+                    if (elapsed >= 1) {
                         setTimeLeft((prev) => {
-                            if (prev <= 1) return 0;
-                            if (prev <= 11 && prev > 1) playTickSound();
-                            return prev - 1;
+                            const newTime = Math.max(0, prev - elapsed);
+                            if (newTime <= 11 && newTime > 1) playTickSound();
+                            return newTime;
                         });
-                    }, 1000);
-                }
+                        setLastUpdateTime(now);
+                    }
+                }, 100);
+            } else if (timeLeft === 0 && isRunning) {
+                handleCycleEnd();
             }
-            return () => clearInterval(interval);
+            
+            return () => {
+                if (interval) clearInterval(interval);
+            };
           }, [isRunning, timeLeft]);
 
           const toggleTimer = () => {
-            if (!activeTaskId && !isRunning) { alert("⚠️ Sélectionnez une tâche pour commencer !"); return; }
             initAudio(); 
             const newRunningState = !isRunning; 
             setIsRunning(newRunningState);
