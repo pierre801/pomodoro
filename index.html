@@ -147,7 +147,6 @@
           const [isRunning, setIsRunning] = useState(false);
           const [currentCycle, setCurrentCycle] = useState(1);
           const [isWorkSession, setIsWorkSession] = useState(true);
-          const [lastUpdateTime, setLastUpdateTime] = useState(Date.now());
           const [videoHistory, setVideoHistory] = useState([]);
           const [todayPomodoros, setTodayPomodoros] = useState(0);
           const [lastResetDate, setLastResetDate] = useState('');
@@ -383,35 +382,27 @@
                 }
             }
           };
+
           useEffect(() => {
             let interval = null;
-            
-            if (isRunning && timeLeft > 0) {
-                setLastUpdateTime(Date.now());
-                
-                interval = setInterval(() => {
-                    const now = Date.now();
-                    const elapsed = Math.floor((now - lastUpdateTime) / 1000);
-                    
-                    if (elapsed >= 1) {
+            if (isRunning) {
+                if (timeLeft === 0) {
+                    handleCycleEnd();
+                } else {
+                    interval = setInterval(() => {
                         setTimeLeft((prev) => {
-                            const newTime = Math.max(0, prev - elapsed);
-                            if (newTime <= 11 && newTime > 1) playTickSound();
-                            return newTime;
+                            if (prev <= 1) return 0;
+                            if (prev <= 11 && prev > 1) playTickSound();
+                            return prev - 1;
                         });
-                        setLastUpdateTime(now);
-                    }
-                }, 100);
-            } else if (timeLeft === 0 && isRunning) {
-                handleCycleEnd();
+                    }, 1000);
+                }
             }
-            
-            return () => {
-                if (interval) clearInterval(interval);
-            };
+            return () => clearInterval(interval);
           }, [isRunning, timeLeft]);
 
           const toggleTimer = () => {
+            if (!activeTaskId && !isRunning) { alert("⚠️ Sélectionnez une tâche pour commencer !"); return; }
             initAudio(); 
             const newRunningState = !isRunning; 
             setIsRunning(newRunningState);
@@ -772,7 +763,7 @@
                           
                           {/* Boutons de contrôle */}
                           <div className="flex justify-center gap-4">
-                              <button onClick={toggleTimer} className={`w-20 h-20 rounded-3xl transition-all flex items-center justify-center ${isDarkMode ? 'glass-card-dark' : 'glass-card'} ${!activeTaskId && !isRunning ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'}`}>
+                              <button onClick={toggleTimer} className={`w-20 h-20 rounded-3xl transition-all flex items-center justify-center ${isDarkMode ? 'glass-card-dark' : 'glass-card'} hover:scale-105`}>
                                   {isRunning ? <div className="pause-icon scale-150"><div className="pause-bar"></div><div className="pause-bar"></div></div> : <div className="play-icon scale-150"></div>}
                               </button>
                               <button onClick={stopTimer} className={`w-20 h-20 rounded-3xl flex items-center justify-center ${isDarkMode ? 'glass-card-dark' : 'glass-card'} hover:scale-105 transition-all`}><div className="stop-icon scale-150"></div></button>
