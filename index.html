@@ -669,6 +669,97 @@
                                   <span className="text-base opacity-70">({Math.floor(todayMinutes / 60)}h {todayMinutes % 60}m)</span>
                               </div>
                           </div>
+                          
+                          {/* EN COURS */}
+                          {tasksInProgress.length > 0 && (
+                            <div className={`p-8 rounded-3xl ${isDarkMode ? 'glass-card-dark' : 'glass-card'}`}>
+                              <div className="flex justify-between items-center mb-4">
+                                  <h2 className="text-xl font-semibold">En cours</h2>
+                                  <span className="text-xs font-bold px-2 py-1 rounded-lg bg-opacity-20" style={{backgroundColor: theme.primary, color: theme.text}}>
+                                      {getEstimatedEndTime()}
+                                  </span>
+                              </div>
+                              <div className="space-y-3">
+                                {tasksInProgress.map((task, index) => {
+                                  const isActive = activeTaskId === task.id;
+                                  const activeCardStyle = isActive 
+                                    ? { backgroundColor: isDarkMode ? '#111827' : '#FFFFFF', borderColor: theme.secondary, color: theme.text, boxShadow: `0 4px 6px -1px ${theme.secondary}40` } 
+                                    : { ...inputStyle, backgroundColor: isDarkMode ? theme.bg : '#FFFFFF' };
+                                  
+                                  const taskSubtasks = task.subtasks || [];
+                                  const completedSubtasks = taskSubtasks.filter(st => st.completed).length;
+
+                                  return (
+                                    <div key={task.id} draggable onDragStart={() => (dragItem.current = index)} onDragEnter={() => (dragOverItem.current = index)} onDragEnd={handleSort} onDragOver={(e) => e.preventDefault()} onClick={() => activateTask(task.id)} className={`p-4 rounded-2xl border card-draggable transition-all cursor-pointer relative group ${isActive ? 'scale-[1.02]' : 'hover:opacity-80'}`} style={activeCardStyle}>
+                                        {isActive && <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full active-dot border-2 border-white" style={{backgroundColor: theme.accent}}></div>}
+                                        <div className="flex justify-between items-start mb-2 pl-3">
+                                          <div className="font-medium flex-1 flex items-center" style={{color: isActive ? theme.secondary : theme.text}}>
+                                              <GripHandle />
+                                              {task.name}
+                                              {isActive && <span className="ml-2 text-xs px-2 py-0.5 rounded-full font-bold" style={{backgroundColor: theme.secondary, color: '#fff'}}>ACTIVE</span>}
+                                          </div>
+                                          <div className="flex gap-2 z-10 relative">
+                                              <button onClick={(e) => { e.stopPropagation(); addToGoogleCalendar(task); }} className="px-3 py-1 border-2 rounded-xl text-xs transition hover:opacity-90 flex items-center" style={{...secondaryBtnStyle, backgroundColor: '#FFFFFF', color: '#151515'}} title="Ajouter à l'agenda">📅</button>
+                                              <button onClick={(e) => { e.stopPropagation(); addSubtaskToTask(task.id); }} className="px-3 py-1 border-2 rounded-xl text-xs transition hover:opacity-90 flex items-center" style={secondaryBtnStyle} title="Ajouter sous-tâche"><div className="plus-icon"></div></button>
+                                              <button onClick={(e) => completeTask(task.id, e)} className="px-3 py-1 border-2 rounded-xl text-xs transition hover:opacity-90" style={secondaryBtnStyle}>Fini</button>
+                                          </div>
+                                        </div>
+                                        
+                                        <div className="text-xs font-medium pl-9 opacity-70 mb-2">
+                                            <span>Temps: {formatCycles(task.spentCycles || 0)}</span>
+                                            {isActive && isWorkSession && isRunning && <span className="ml-1 text-xs opacity-60 animate-pulse">(+1 en cours...)</span>}
+                                            <span className="ml-1">/ Visé: {formatCycles(task.targetCycles)}</span>
+                                        </div>
+                                        
+                                        {taskSubtasks.length > 0 && (
+                                            <div className="pl-9 mt-3 space-y-2">
+                                                <div className="text-xs font-semibold opacity-70 mb-2">
+                                                    Sous-tâches ({completedSubtasks}/{taskSubtasks.length})
+                                                </div>
+                                                {taskSubtasks.map(st => (
+                                                    <div key={st.id} onClick={(e) => { e.stopPropagation(); toggleSubtask(task.id, st.id); }} className={`flex items-center gap-2 text-xs cursor-pointer hover:opacity-80 ${st.completed ? 'subtask-completed' : ''}`}>
+                                                        <input type="checkbox" checked={st.completed} onChange={() => {}} className="checkbox-custom" style={{borderColor: theme.border}} />
+                                                        <span className="flex-1">{st.name}</span>
+                                                        <span className="opacity-50">{formatCycles(st.targetCycles)}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* HISTORIQUE TÂCHES */}
+                          {completedTasks.length > 0 && (
+                            <div className={`p-8 rounded-3xl ${isDarkMode ? 'glass-card-dark' : 'glass-card'}`}>
+                              <div className="flex justify-between items-center mb-4">
+                                 <h2 className="text-xl font-semibold">Historique Tâches</h2>
+                                 <button onClick={clearAllCompletedTasks} className="text-xs px-2 py-1 bg-red-100 text-red-600 border border-red-200 rounded hover:bg-red-200">Effacer</button>
+                              </div>
+                              <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                                {completedTasks.slice(0, 10).map((task) => (
+                                  <div key={task.id} className="p-3 rounded-xl border text-sm" style={{...inputStyle, backgroundColor: isDarkMode ? theme.bg : '#FFFFFF'}}>
+                                    <div className="flex justify-between items-center">
+                                      <div className="font-medium">{task.name}</div>
+                                      <div className="flex gap-2">
+                                        <button onClick={() => moveToInProgress(task.id)} className="hover:underline text-xs" style={{color: theme.secondary}}>Reprendre</button>
+                                        <button onClick={() => deleteCompletedTask(task.id)} className="opacity-50 hover:opacity-100 hover:text-red-500"><div className="trash-icon" style={{transform: 'scale(0.8)'}}></div></button>
+                                      </div>
+                                    </div>
+                                    <div className="flex justify-between mt-1 text-xs opacity-70">
+                                        <span>{formatCycles(task.cycles)} / {formatCycles(task.targetCycles || 0)}</span>
+                                        <span className={task.cycles < task.targetCycles ? 'text-green-500 font-bold' : task.cycles > task.targetCycles ? 'text-red-500 font-bold' : ''}>
+                                            {task.cycles < task.targetCycles ? '+1 Vie' : task.cycles > task.targetCycles ? '-1 Vie' : 'Neutre'}
+                                        </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                       </div>
                   </div>
                   
@@ -733,94 +824,6 @@
                     </div>
                   )}
                   
-                  {tasksInProgress.length > 0 && (
-                    <div className={`p-8 rounded-3xl ${isDarkMode ? 'glass-card-dark' : 'glass-card'}`}>
-                      <div className="flex justify-between items-center mb-4">
-                          <h2 className="text-xl font-semibold">En cours</h2>
-                          <span className="text-xs font-bold px-2 py-1 rounded-lg bg-opacity-20" style={{backgroundColor: theme.primary, color: theme.text}}>
-                              {getEstimatedEndTime()}
-                          </span>
-                      </div>
-                      <div className="space-y-3">
-                        {tasksInProgress.map((task, index) => {
-                          const isActive = activeTaskId === task.id;
-                          const activeCardStyle = isActive 
-                            ? { backgroundColor: isDarkMode ? '#111827' : '#FFFFFF', borderColor: theme.secondary, color: theme.text, boxShadow: `0 4px 6px -1px ${theme.secondary}40` } 
-                            : { ...inputStyle, backgroundColor: isDarkMode ? theme.bg : '#FFFFFF' };
-                          
-                          const taskSubtasks = task.subtasks || [];
-                          const completedSubtasks = taskSubtasks.filter(st => st.completed).length;
-
-                          return (
-                            <div key={task.id} draggable onDragStart={() => (dragItem.current = index)} onDragEnter={() => (dragOverItem.current = index)} onDragEnd={handleSort} onDragOver={(e) => e.preventDefault()} onClick={() => activateTask(task.id)} className={`p-4 rounded-2xl border card-draggable transition-all cursor-pointer relative group ${isActive ? 'scale-[1.02]' : 'hover:opacity-80'}`} style={activeCardStyle}>
-                                {isActive && <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full active-dot border-2 border-white" style={{backgroundColor: theme.accent}}></div>}
-                                <div className="flex justify-between items-start mb-2 pl-3">
-                                  <div className="font-medium flex-1 flex items-center" style={{color: isActive ? theme.secondary : theme.text}}>
-                                      <GripHandle />
-                                      {task.name}
-                                      {isActive && <span className="ml-2 text-xs px-2 py-0.5 rounded-full font-bold" style={{backgroundColor: theme.secondary, color: '#fff'}}>ACTIVE</span>}
-                                  </div>
-                                  <div className="flex gap-2 z-10 relative">
-                                      <button onClick={(e) => { e.stopPropagation(); addToGoogleCalendar(task); }} className="px-3 py-1 border-2 rounded-xl text-xs transition hover:opacity-90 flex items-center" style={{...secondaryBtnStyle, backgroundColor: '#FFFFFF', color: '#151515'}} title="Ajouter à l'agenda">📅</button>
-                                      <button onClick={(e) => { e.stopPropagation(); addSubtaskToTask(task.id); }} className="px-3 py-1 border-2 rounded-xl text-xs transition hover:opacity-90 flex items-center" style={secondaryBtnStyle} title="Ajouter sous-tâche"><div className="plus-icon"></div></button>
-                                      <button onClick={(e) => completeTask(task.id, e)} className="px-3 py-1 border-2 rounded-xl text-xs transition hover:opacity-90" style={secondaryBtnStyle}>Fini</button>
-                                  </div>
-                                </div>
-                                
-                                <div className="text-xs font-medium pl-9 opacity-70 mb-2">
-                                    <span>Temps: {formatCycles(task.spentCycles || 0)}</span>
-                                    {isActive && isWorkSession && isRunning && <span className="ml-1 text-xs opacity-60 animate-pulse">(+1 en cours...)</span>}
-                                    <span className="ml-1">/ Visé: {formatCycles(task.targetCycles)}</span>
-                                </div>
-                                
-                                {taskSubtasks.length > 0 && (
-                                    <div className="pl-9 mt-3 space-y-2">
-                                        <div className="text-xs font-semibold opacity-70 mb-2">
-                                            Sous-tâches ({completedSubtasks}/{taskSubtasks.length})
-                                        </div>
-                                        {taskSubtasks.map(st => (
-                                            <div key={st.id} onClick={(e) => { e.stopPropagation(); toggleSubtask(task.id, st.id); }} className={`flex items-center gap-2 text-xs cursor-pointer hover:opacity-80 ${st.completed ? 'subtask-completed' : ''}`}>
-                                                <input type="checkbox" checked={st.completed} onChange={() => {}} className="checkbox-custom" style={{borderColor: theme.border}} />
-                                                <span className="flex-1">{st.name}</span>
-                                                <span className="opacity-50">{formatCycles(st.targetCycles)}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {completedTasks.length > 0 && (
-                    <div className={`p-8 rounded-3xl ${isDarkMode ? 'glass-card-dark' : 'glass-card'}`}>
-                      <div className="flex justify-between items-center mb-4">
-                         <h2 className="text-xl font-semibold">Historique Tâches</h2>
-                         <button onClick={clearAllCompletedTasks} className="text-xs px-2 py-1 bg-red-100 text-red-600 border border-red-200 rounded hover:bg-red-200">Effacer</button>
-                      </div>
-                      <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
-                        {completedTasks.slice(0, 10).map((task) => (
-                          <div key={task.id} className="p-3 rounded-xl border text-sm" style={{...inputStyle, backgroundColor: isDarkMode ? theme.bg : '#FFFFFF'}}>
-                            <div className="flex justify-between items-center">
-                              <div className="font-medium">{task.name}</div>
-                              <div className="flex gap-2">
-                                <button onClick={() => moveToInProgress(task.id)} className="hover:underline text-xs" style={{color: theme.secondary}}>Reprendre</button>
-                                <button onClick={() => deleteCompletedTask(task.id)} className="opacity-50 hover:opacity-100 hover:text-red-500"><div className="trash-icon" style={{transform: 'scale(0.8)'}}></div></button>
-                              </div>
-                            </div>
-                            <div className="flex justify-between mt-1 text-xs opacity-70">
-                                <span>{formatCycles(task.cycles)} / {formatCycles(task.targetCycles || 0)}</span>
-                                <span className={task.cycles < task.targetCycles ? 'text-green-500 font-bold' : task.cycles > task.targetCycles ? 'text-red-500 font-bold' : ''}>
-                                    {task.cycles < task.targetCycles ? '+1 Vie' : task.cycles > task.targetCycles ? '-1 Vie' : 'Neutre'}
-                                </span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
                 
                 <div className="space-y-6">
