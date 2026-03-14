@@ -32,9 +32,6 @@
         .grip-icon { display: flex; flex-direction: column; gap: 2px; justify-content: center; align-items: center; width: 10px; cursor: move; }
         .grip-dot { width: 4px; height: 4px; background-color: currentColor; opacity: 0.3; border-radius: 50%; }
         .card-draggable:active { cursor: grabbing; }
-        .heart-icon { width: 24px; height: 24px; display: inline-block; }
-        .heart-fill { fill: currentColor; } 
-        .heart-empty { fill: transparent; stroke: currentColor; stroke-width: 2; }
         .plus-icon { position: relative; width: 14px; height: 14px; }
         .plus-icon::before, .plus-icon::after { content: ''; position: absolute; background-color: currentColor; left: 50%; top: 50%; }
         .plus-icon::before { width: 2px; height: 14px; transform: translate(-50%, -50%); }
@@ -43,9 +40,6 @@
         @keyframes popIn { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
         .modal-animate { animation: popIn 0.3s ease-out forwards; }
         .progress-ring__circle { transition: stroke-dashoffset 0.35s; transform: rotate(-90deg); transform-origin: 50% 50%; }
-        .trophy-locked { filter: grayscale(100%); opacity: 0.4; }
-        .trophy-unlocked { filter: none; opacity: 1; transform: scale(1); transition: transform 0.2s; }
-        .trophy-unlocked:hover { transform: scale(1.1); }
         @keyframes pulse-active {
             0% { box-shadow: 0 0 0 0 rgba(var(--pulse-color), 0.7); }
             70% { box-shadow: 0 0 0 6px rgba(var(--pulse-color), 0); }
@@ -105,17 +99,6 @@
             night: { bg: "#2C1810", card: "#432818", text: "#FBDEC4", primary: "#F2994A", secondary: "#FBDEC4", accent: "#22C55E", border: "#6B4226" }
         };
 
-        const BADGES_DEF = [
-            { id: 'FIRST_STEP', icon: '🌱', name: 'Premiers pas', desc: 'Terminer votre premier Pomodoro' },
-            { id: 'EARLY_BIRD', icon: '🌅', name: 'Lève-tôt', desc: 'Terminer un cycle avant 9h' },
-            { id: 'NIGHT_OWL', icon: '🦉', name: 'Oiseau de nuit', desc: 'Terminer un cycle après 22h' },
-            { id: 'MARATHON', icon: '🏃', name: 'Marathonien', desc: 'Faire 8 cycles en une journée' },
-            { id: 'STREAK_3', icon: '🔥', name: 'Régulier', desc: 'Série de 3 jours consécutifs' },
-            { id: 'MASTER', icon: '👑', name: 'Maître du temps', desc: 'Atteindre le niveau 10' },
-        ];
-
-        const FullHeart = ({ color }) => <svg viewBox="0 0 24 24" className="w-6 h-6 fill-current" style={{color: color}}><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>;
-        const EmptyHeart = ({ color }) => <svg viewBox="0 0 24 24" className="w-6 h-6 fill-transparent stroke-current stroke-2" style={{color: color}}><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>;
         const GripHandle = () => <div className="grip-icon mr-3"><div className="flex gap-[2px]"><div className="grip-dot"></div><div className="grip-dot"></div></div><div className="flex gap-[2px]"><div className="grip-dot"></div><div className="grip-dot"></div></div><div className="flex gap-[2px]"><div className="grip-dot"></div><div className="grip-dot"></div></div></div>;
         
         const ProgressRing = ({ radius, stroke, progress, color, trackColor }) => {
@@ -160,12 +143,7 @@
           const [tasksInProgress, setTasksInProgress] = useState([]);
           const [completedTasks, setCompletedTasks] = useState([]);
           const [taskStats, setTaskStats] = useState({});
-          const [activeTaskId, setActiveTaskId] = useState(null);
-          const [lives, setLives] = useState(5); 
-          const [showGameOver, setShowGameOver] = useState(false);
-          const [xp, setXp] = useState(0);
-          const [streak, setStreak] = useState(0);
-          const [badges, setBadges] = useState([]); 
+          const [activeTaskId, setActiveTaskId] = useState(null); 
           const [volume, setVolume] = useState(0.3); 
           const [isDarkMode, setIsDarkMode] = useState(false);
           
@@ -197,10 +175,6 @@
             const tasks = JSON.parse(localStorage.getItem('completedTasks') || '[]');
             const stats = JSON.parse(localStorage.getItem('taskStats') || '{}');
             const inProgress = JSON.parse(localStorage.getItem('tasksInProgress') || '[]');
-            const savedLives = parseInt(localStorage.getItem('pomodoroLives'));
-            const savedXp = parseInt(localStorage.getItem('pomodoroXp') || '0');
-            const savedStreak = parseInt(localStorage.getItem('pomodoroStreak') || '0');
-            const savedBadges = JSON.parse(localStorage.getItem('pomodoroBadges') || '[]');
             const savedMode = localStorage.getItem('pomodoroDarkMode') === 'true';
             
             const savedMediaMode = localStorage.getItem('pomodoroMediaMode') || 'video';
@@ -212,42 +186,17 @@
             setCompletedTasks(tasks);
             setTaskStats(stats);
             setTasksInProgress(inProgress);
-            setXp(savedXp);
-            setStreak(savedStreak);
-            setBadges(savedBadges);
             setIsDarkMode(savedMode);
             setMediaMode(savedMediaMode);
             setCalendarEmail(savedCalendarEmail);
             
-            if (!isNaN(savedLives)) { setLives(savedLives); if (savedLives === 0) setShowGameOver(true); } else { setLives(5); }
             if ("Notification" in window && Notification.permission !== "granted") Notification.requestPermission();
             checkDailyReset();
-            checkStreakValidity(date, savedStreak);
           }, []);
 
           const toggleDarkMode = () => { const newMode = !isDarkMode; setIsDarkMode(newMode); localStorage.setItem('pomodoroDarkMode', newMode.toString()); };
           
-          const checkStreakValidity = (lastDate, currentStreak) => {
-              if (!lastDate) return;
-              const today = new Date().toDateString();
-              if (lastDate === today) return;
-              const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
-              if (lastDate !== yesterday.toDateString()) { setStreak(0); localStorage.setItem('pomodoroStreak', '0'); }
-          };
           
-          const addXp = (amount) => { const newXp = xp + amount; setXp(newXp); localStorage.setItem('pomodoroXp', newXp.toString()); checkBadges(newXp); };
-          const unlockBadge = (badgeId) => { if (!badges.includes(badgeId)) { const newBadges = [...badges, badgeId]; setBadges(newBadges); localStorage.setItem('pomodoroBadges', JSON.stringify(newBadges)); if ("Notification" in window && Notification.permission === "granted") new Notification("Trophée débloqué ! 🏆", { body: BADGES_DEF.find(b => b.id === badgeId).name }); } };
-          const checkBadges = (currentXp = xp) => {
-              if (todayPomodoros >= 1 || completedTasks.length > 0) unlockBadge('FIRST_STEP');
-              if (todayPomodoros >= 8) unlockBadge('MARATHON');
-              if (streak >= 3) unlockBadge('STREAK_3');
-              if (currentXp >= 5000) unlockBadge('MASTER');
-              const hour = new Date().getHours();
-              if (hour < 9) unlockBadge('EARLY_BIRD');
-              if (hour >= 22) unlockBadge('NIGHT_OWL');
-          };
-          const getLevel = () => Math.floor(xp / 500) + 1;
-          const getXpProgress = () => ((xp % 500) / 500) * 100;
 
           useEffect(() => { document.title = isRunning ? `[${Math.floor(timeLeft / 60)}'] Pomodoro` : "Pomodoro Focus Timer"; }, [timeLeft, isRunning]);
 
@@ -264,14 +213,9 @@
                       },
                       onStateChange: (e) => {
                           if (e.data === window.YT.PlayerState.PLAYING) {
-                              if (!stateRef.current.isRunning) {
-                                  if (stateRef.current.activeTaskId) {
-                                      setIsRunning(true);
-                                      initAudio();
-                                  } else {
-                                      e.target.pauseVideo();
-                                      alert("⚠️ Veuillez sélectionner une tâche avant de lancer la vidéo !");
-                                  }
+                              if (!stateRef.current.isRunning && stateRef.current.activeTaskId) {
+                                  setIsRunning(true);
+                                  initAudio();
                               }
                           } else if (e.data === window.YT.PlayerState.PAUSED) {
                               if (stateRef.current.isRunning) {
@@ -325,7 +269,6 @@
                 const newPomodoros = todayPomodoros + 1;
                 setTodayPomodoros(newPomodoros);
                 localStorage.setItem('todayPomodoros', newPomodoros.toString());
-                addXp(100);
                 
                 if (activeTaskId) {
                     const updatedTasks = tasksInProgress.map(t => {
@@ -338,14 +281,6 @@
                     localStorage.setItem('tasksInProgress', JSON.stringify(updatedTasks));
                 }
 
-                const today = new Date().toDateString();
-                const lastStreakDate = localStorage.getItem('lastStreakUpdateDate');
-                if (lastStreakDate !== today) {
-                    const newStreak = streak + 1; setStreak(newStreak);
-                    localStorage.setItem('pomodoroStreak', newStreak.toString());
-                    localStorage.setItem('lastStreakUpdateDate', today);
-                }
-                checkBadges();
                 checkDailyReset();
                 
                 // Incrémenter le cycle et passer en pause
@@ -422,7 +357,6 @@
                 });
                 setTasksInProgress(updatedTasks);
                 localStorage.setItem('tasksInProgress', JSON.stringify(updatedTasks));
-                addXp(50); 
             }
 
             setIsRunning(false); setCurrentCycle(1); setIsWorkSession(true);
@@ -608,10 +542,6 @@
                   completedTasks: localStorage.getItem('completedTasks'),
                   taskStats: localStorage.getItem('taskStats'),
                   tasksInProgress: localStorage.getItem('tasksInProgress'),
-                  pomodoroLives: localStorage.getItem('pomodoroLives'),
-                  pomodoroXp: localStorage.getItem('pomodoroXp'),
-                  pomodoroStreak: localStorage.getItem('pomodoroStreak'),
-                  pomodoroBadges: localStorage.getItem('pomodoroBadges'),
                   pomodoroMediaMode: localStorage.getItem('pomodoroMediaMode'),
                   pomodoroCalendarEmail: localStorage.getItem('pomodoroCalendarEmail')
               };
@@ -628,12 +558,6 @@
             const task = tasksInProgress.find(t => t.id === taskId); if (!task) return;
             let finalCycles = task.spentCycles || 0;
             if (activeTaskId === taskId) { finalCycles += 1; }
-            addXp(50 * Math.max(1, finalCycles)); 
-            let newLives = lives;
-            if (finalCycles < task.targetCycles) newLives = Math.min(lives + 1, 10);
-            else if (finalCycles > task.targetCycles) newLives = Math.max(lives - 1, 0);
-            setLives(newLives); localStorage.setItem('pomodoroLives', newLives);
-            if (newLives === 0) { setShowGameOver(true); stopTimer(); }
             const completedTask = { ...task, cycles: finalCycles, completedAt: new Date().toISOString() };
             const newCompletedTasks = [completedTask, ...completedTasks];
             setCompletedTasks(newCompletedTasks); localStorage.setItem('completedTasks', JSON.stringify(newCompletedTasks));
@@ -648,7 +572,6 @@
                 setIsRunning(false); 
                 if (mediaMode === 'video' && playerRef.current && typeof playerRef.current.pauseVideo === 'function') playerRef.current.pauseVideo(); 
             }
-            checkBadges();
           };
 
           const handleSort = () => {
@@ -677,7 +600,6 @@
           const deleteCompletedTask = (taskId) => { const newC = completedTasks.filter(t => t.id !== taskId); setCompletedTasks(newC); localStorage.setItem('completedTasks', JSON.stringify(newC)); };
           const clearAllCompletedTasks = () => { if (confirm("Effacer l'historique ?")) { setCompletedTasks([]); localStorage.setItem('completedTasks', '[]'); } };
           const deleteStat = (taskName) => { if (confirm(`Supprimer stats pour "${taskName}" ?`)) { const ns = { ...taskStats }; delete ns[taskName]; setTaskStats(ns); localStorage.setItem('taskStats', JSON.stringify(ns)); } };
-          const restartGame = () => { setLives(5); localStorage.setItem('pomodoroLives', 5); setShowGameOver(false); };
           const sendNotification = (title, body) => { if ("Notification" in window && Notification.permission === "granted") new Notification(title, { body: body, icon: "https://cdn-icons-png.flaticon.com/512/3209/3209965.png" }); };
           const formatCycles = (c) => { const t = Math.floor(c/8), r = c%8; return t>0 ? `${t}T ${r}C` : `${r}C`; };
           const getTargetLabel = (c) => formatCycles(c);
@@ -696,38 +618,9 @@
 
           return (
             <div className="transition-colors duration-500">
-              {showGameOver && (
-                  <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-                      <div className="p-8 rounded-3xl border-4 max-w-lg w-full text-center modal-animate shadow-2xl" style={{backgroundColor: theme.card, borderColor: theme.primary}}>
-                          <h2 className="text-5xl font-bold mb-6 tracking-wider" style={{color: theme.primary}}>GAME OVER</h2>
-                          <p className="text-xl mb-8" style={{color: theme.text}}>Recommence, tu dois encore t'améliorer sur ta gestion du temps</p>
-                          <button onClick={restartGame} className="px-8 py-4 text-white text-lg font-bold rounded-2xl hover:opacity-90 transition border-2" style={primaryBtnStyle}>Recommencer</button>
-                      </div>
-                  </div>
-              )}
               
               {/* TIMER XXL - FULL SCREEN ABOVE THE FOLD */}
               <div className={`min-h-screen flex items-center justify-center px-4 md:px-8 py-8 relative ${isDarkMode ? 'gradient-bg-dark' : 'gradient-bg'}`}>
-                  {/* Stats en haut à droite */}
-                  <div className="absolute top-6 right-6 flex flex-col items-end gap-2 z-10">
-                      <div className="flex gap-3">
-                          <div className={`px-4 py-3 rounded-2xl flex items-center gap-2 ${isDarkMode ? 'glass-card-dark' : 'glass-card'}`}>
-                              <span className="text-xl">🔥</span><span className="font-bold">{streak}</span>
-                          </div>
-                          <div className={`px-4 py-3 rounded-2xl flex gap-1 ${isDarkMode ? 'glass-card-dark' : 'glass-card'}`}>
-                              {[...Array(10)].map((_, i) => <div key={i} className="heart-icon">{i < lives ? <FullHeart color={theme.primary} /> : <EmptyHeart color={theme.border} />}</div>)}
-                          </div>
-                      </div>
-                      <div className={`p-4 rounded-2xl w-64 ${isDarkMode ? 'glass-card-dark' : 'glass-card'}`}>
-                          <div className="flex justify-between items-end mb-2">
-                              <span className="font-semibold text-sm">Niveau {getLevel()}</span>
-                              <span className="text-xs opacity-70">{xp} XP</span>
-                          </div>
-                          <div className="w-full bg-white bg-opacity-20 rounded-full h-2.5 border border-white border-opacity-10">
-                              <div className="h-2.5 rounded-full transition-all duration-500" style={{ width: `${getXpProgress()}%`, backgroundColor: theme.accent }}></div>
-                          </div>
-                      </div>
-                  </div>
                   
                   {/* TIMER EN 2 COLONNES */}
                   <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
@@ -992,24 +885,6 @@
                     </div>
                   </div>
                   
-                  <div className={`p-8 rounded-3xl ${isDarkMode ? 'glass-card-dark' : 'glass-card'}`}>
-                      <h2 className="text-xl font-semibold mb-4">Succès</h2>
-                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
-                          {BADGES_DEF.map((badge) => {
-                              const unlocked = badges.includes(badge.id);
-                              return (
-                                  <div key={badge.id} className={`group relative flex flex-col items-center text-center p-2 rounded-xl transition cursor-help ${unlocked ? 'border-2 trophy-unlocked' : 'opacity-50 trophy-locked'}`} style={unlocked ? {borderColor: theme.accent, backgroundColor: isDarkMode ? theme.bg : '#fff'} : {}}>
-                                      <div className="text-3xl mb-1">{badge.icon}</div>
-                                      <div className="text-[10px] font-bold leading-tight">{badge.name}</div>
-                                      <div className="absolute bottom-full mb-2 w-32 p-2 text-white text-[10px] rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-20 pointer-events-none shadow-xl" style={{backgroundColor: theme.text, color: theme.bg}}>
-                                          {badge.desc}
-                                          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent" style={{borderTopColor: theme.text}}></div>
-                                      </div>
-                                  </div>
-                              );
-                          })}
-                      </div>
-                  </div>
                 </div>
               </div>
               </div>
