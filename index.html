@@ -171,8 +171,8 @@
             const secondHandY = radius + secondHandLength * Math.sin(secondsAngle * Math.PI / 180);
             
             return (
-                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none">
-                    <svg height={radius * 2} width={radius * 2}>
+                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none w-full h-full">
+                    <svg viewBox={`0 0 ${radius * 2} ${radius * 2}`} className="w-full h-full">
                         {/* Track */}
                         <circle stroke={trackColor} strokeWidth={stroke} fill="transparent" r={normalizedRadius} cx={radius} cy={radius} opacity="0.15" />
                         
@@ -753,57 +753,62 @@
               <div className={`min-h-screen flex items-center justify-center px-4 md:px-8 py-8 relative ${isDarkMode ? 'gradient-bg-dark' : 'gradient-bg'}`}>
                   
                   {/* TIMER EN 2 COLONNES */}
-                  <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                  <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
                       {/* COLONNE GAUCHE : CHRONOMÈTRE GÉANT */}
                       <div className="flex items-center justify-center">
-                          <div className="relative">
-                              {/* Fond style Seiko */}
+                          <div className="relative w-full flex justify-center">
+                              {/* Fond style Seiko - Responsive */}
                               <div className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 rounded-full ${isDarkMode ? 'seiko-clock-bg-dark' : 'seiko-clock-bg'}`} style={{
-                                  width: '600px',
-                                  height: '600px',
+                                  width: 'min(90vw, 600px)',
+                                  height: 'min(90vw, 600px)',
+                                  maxWidth: '600px',
+                                  maxHeight: '600px',
                                   borderColor: isDarkMode ? '#3a3a38' : '#d4d4d0'
                               }}></div>
                               
-                              <ProgressRing radius={300} stroke={6} progress={progressPercentage} color={theme.primary} trackColor={isDarkMode ? '#4a4a4a' : '#d1d5db'} timeLeft={timeLeft} textColor={theme.text} />
-                              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
-                                  <div className="timer-text text-9xl tracking-tight mb-2" style={{color: theme.text}}>{formatTime(timeLeft)}</div>
-                                  {activeTaskId && (
-                                      <div className="mt-4 text-lg font-medium opacity-70 max-w-xs truncate px-4" style={{color: theme.secondary}}>
-                                          {tasksInProgress.find(t => t.id === activeTaskId)?.name || ''}
-                                      </div>
-                                  )}
+                              {/* ProgressRing responsive avec SVG viewBox */}
+                              <div className="relative" style={{width: 'min(90vw, 600px)', height: 'min(90vw, 600px)', maxWidth: '600px', maxHeight: '600px'}}>
+                                  <ProgressRing radius={300} stroke={6} progress={progressPercentage} color={theme.primary} trackColor={isDarkMode ? '#4a4a4a' : '#d1d5db'} timeLeft={timeLeft} textColor={theme.text} />
+                                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center w-full px-4">
+                                      <div className="timer-text text-5xl sm:text-6xl md:text-7xl lg:text-8xl xl:text-9xl tracking-tight mb-2" style={{color: theme.text}}>{formatTime(timeLeft)}</div>
+                                      {activeTaskId && (
+                                          <div className="mt-2 md:mt-4 text-sm md:text-base lg:text-lg font-medium opacity-70 max-w-xs mx-auto truncate px-2" style={{color: theme.secondary}}>
+                                              {tasksInProgress.find(t => t.id === activeTaskId)?.name || ''}
+                                          </div>
+                                      )}
+                                  </div>
                               </div>
                           </div>
                       </div>
                       
                       {/* COLONNE DROITE : CONTRÔLES & INFOS */}
-                      <div className="flex flex-col gap-8">
+                      <div className="flex flex-col gap-6 lg:gap-8">
                           {/* État TRAVAIL/PAUSE */}
                           <div className="text-center">
-                              <span className={`text-4xl font-light tracking-wide px-8 py-4 rounded-3xl inline-block ${isDarkMode ? 'glass-card-dark' : 'glass-card'} ${isWorkSession ? 'animate-pulse' : ''}`} style={{color: theme.text}}>
+                              <span className={`text-2xl sm:text-3xl lg:text-4xl font-light tracking-wide px-6 py-3 lg:px-8 lg:py-4 rounded-3xl inline-block ${isDarkMode ? 'glass-card-dark' : 'glass-card'} ${isWorkSession ? 'animate-pulse' : ''}`} style={{color: theme.text}}>
                                   {isWorkSession ? '⚡ TRAVAIL' : '☕ PAUSE'}
                               </span>
                           </div>
                           
                           {/* Cycle */}
-                          <div className="text-center text-2xl font-light opacity-60" style={{color: theme.text}}>
+                          <div className="text-center text-xl sm:text-2xl font-light opacity-60" style={{color: theme.text}}>
                               Cycle {currentCycle}/4
                           </div>
                           
                           {/* Boutons de contrôle */}
-                          <div className="flex justify-center gap-4">
-                              <button onClick={toggleTimer} className={`w-20 h-20 rounded-3xl transition-all flex items-center justify-center ${isDarkMode ? 'glass-card-dark' : 'glass-card'} hover:scale-105`}>
-                                  {isRunning ? <div className="pause-icon scale-150"><div className="pause-bar"></div><div className="pause-bar"></div></div> : <div className="play-icon scale-150"></div>}
+                          <div className="flex justify-center gap-3 lg:gap-4">
+                              <button onClick={toggleTimer} className={`w-16 h-16 sm:w-20 sm:h-20 rounded-3xl transition-all flex items-center justify-center ${isDarkMode ? 'glass-card-dark' : 'glass-card'} hover:scale-105`}>
+                                  {isRunning ? <div className="pause-icon scale-125 sm:scale-150"><div className="pause-bar"></div><div className="pause-bar"></div></div> : <div className="play-icon scale-125 sm:scale-150"></div>}
                               </button>
-                              <button onClick={stopTimer} className={`w-20 h-20 rounded-3xl flex items-center justify-center ${isDarkMode ? 'glass-card-dark' : 'glass-card'} hover:scale-105 transition-all`}><div className="stop-icon scale-150"></div></button>
-                              <button onClick={resetTimer} className={`w-20 h-20 rounded-3xl flex items-center justify-center ${isDarkMode ? 'glass-card-dark' : 'glass-card'} hover:scale-105 transition-all`}><div className="reset-icon scale-150"></div></button>
+                              <button onClick={stopTimer} className={`w-16 h-16 sm:w-20 sm:h-20 rounded-3xl flex items-center justify-center ${isDarkMode ? 'glass-card-dark' : 'glass-card'} hover:scale-105 transition-all`}><div className="stop-icon scale-125 sm:scale-150"></div></button>
+                              <button onClick={resetTimer} className={`w-16 h-16 sm:w-20 sm:h-20 rounded-3xl flex items-center justify-center ${isDarkMode ? 'glass-card-dark' : 'glass-card'} hover:scale-105 transition-all`}><div className="reset-icon scale-125 sm:scale-150"></div></button>
                           </div>
                           
                           {/* Stats du jour */}
                           <div className="text-center">
-                              <div className={`text-xl font-light py-4 px-8 rounded-3xl inline-block ${isDarkMode ? 'glass-card-dark' : 'glass-card'}`} style={{color: theme.text}}>
+                              <div className={`text-base sm:text-lg lg:text-xl font-light py-3 px-6 lg:py-4 lg:px-8 rounded-3xl inline-block ${isDarkMode ? 'glass-card-dark' : 'glass-card'}`} style={{color: theme.text}}>
                                   Aujourd'hui : {todayPomodoros} pomodoro{todayPomodoros > 1 ? 's' : ''}<br/>
-                                  <span className="text-base opacity-70">({Math.floor(todayMinutes / 60)}h {todayMinutes % 60}m)</span>
+                                  <span className="text-sm sm:text-base opacity-70">({Math.floor(todayMinutes / 60)}h {todayMinutes % 60}m)</span>
                               </div>
                           </div>
                       </div>
@@ -814,11 +819,11 @@
               {/* CONTENU SCROLLABLE - 2 COLONNES */}
               <div className="w-full" style={{backgroundColor: theme.bg}}>
               <div className="max-w-7xl mx-auto px-4 md:px-8 pb-10 pt-10">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="space-y-6">
-                  <div className={`p-8 rounded-3xl ${isDarkMode ? 'glass-card-dark' : 'glass-card'}`}>
-                    <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-xl font-semibold">Espace Focus</h2>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+                <div className="space-y-4 md:space-y-6">
+                  <div className={`p-4 sm:p-6 md:p-4 sm:p-6 md:p-8 rounded-3xl ${isDarkMode ? 'glass-card-dark' : 'glass-card'}`}>
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-3">
+                        <h2 className="text-lg sm:text-lg sm:text-xl font-semibold">Espace Focus</h2>
                         <div className="flex gap-2">
                             <button onClick={() => changeMediaMode('video')} className={`px-3 py-1 rounded-lg text-xs font-bold transition ${mediaMode === 'video' ? 'opacity-100' : 'opacity-50'}`} style={mediaMode === 'video' ? primaryBtnStyle : secondaryBtnStyle}>🎥 Vidéo</button>
                             <button onClick={() => changeMediaMode('calendar')} className={`px-3 py-1 rounded-lg text-xs font-bold transition ${mediaMode === 'calendar' ? 'opacity-100' : 'opacity-50'}`} style={mediaMode === 'calendar' ? primaryBtnStyle : secondaryBtnStyle}>📅 Agenda</button>
@@ -854,9 +859,9 @@
                   </div>
                   
                   {mediaMode === 'video' && videoHistory.length > 0 && (
-                    <div className={`p-8 rounded-3xl ${isDarkMode ? 'glass-card-dark' : 'glass-card'}`}>
+                    <div className={`p-4 sm:p-6 md:p-8 rounded-3xl ${isDarkMode ? 'glass-card-dark' : 'glass-card'}`}>
                       <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-xl font-semibold">Historique Vidéos</h2>
+                        <h2 className="text-lg sm:text-xl font-semibold">Historique Vidéos</h2>
                         <button onClick={clearHistory} className="text-sm px-4 py-2 rounded-2xl border hover:opacity-90 transition" style={secondaryBtnStyle}>Vider</button>
                       </div>
                       <div className="space-y-3">
@@ -873,9 +878,9 @@
                 </div>
                 
                 <div className="space-y-6">
-                  <div className={`p-8 rounded-3xl ${isDarkMode ? 'glass-card-dark' : 'glass-card'}`}>
+                  <div className={`p-4 sm:p-6 md:p-8 rounded-3xl ${isDarkMode ? 'glass-card-dark' : 'glass-card'}`}>
                     <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-xl font-semibold">Réglages</h2>
+                        <h2 className="text-lg sm:text-xl font-semibold">Réglages</h2>
                         <div className="flex gap-2 items-center">
                             <button onClick={exportData} className="text-xs px-2 py-1 rounded border hover:opacity-80" style={{borderColor: theme.text, color: theme.text}}>💾 Sauvegarder</button>
                             <div className="relative w-14 h-8 rounded-full cursor-pointer transition-colors duration-300 flex items-center px-1" style={{backgroundColor: isDarkMode ? '#4B5563' : '#93C5FD'}} onClick={toggleDarkMode}>
@@ -892,8 +897,8 @@
                     <div><label className="block text-xs font-medium mb-1 opacity-70">Volume ({Math.round(volume * 100)}%)</label><input type="range" min="0" max="1" step="0.1" value={volume} onChange={(e) => setVolume(parseFloat(e.target.value))} className="w-full h-2 rounded-lg appearance-none cursor-pointer" style={{accentColor: theme.primary, backgroundColor: theme.border}}/></div>
                   </div>
                   
-                  <div className={`p-8 rounded-3xl ${isDarkMode ? 'glass-card-dark' : 'glass-card'}`}>
-                    <h2 className="text-xl font-semibold mb-4">Nouvelle tâche</h2>
+                  <div className={`p-4 sm:p-6 md:p-8 rounded-3xl ${isDarkMode ? 'glass-card-dark' : 'glass-card'}`}>
+                    <h2 className="text-lg sm:text-xl font-semibold mb-4">Nouvelle tâche</h2>
                     <div className="space-y-4">
                       <input type="text" value={currentTask} onChange={(e) => setCurrentTask(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && startTask()} placeholder="Nom de la tâche..." className="w-full px-4 py-3 border-2 rounded-2xl focus:outline-none" style={inputStyle} />
                       
@@ -936,9 +941,9 @@
                   
                   {/* EN COURS */}
                   {tasksInProgress.length > 0 && (
-                    <div className={`p-8 rounded-3xl ${isDarkMode ? 'glass-card-dark' : 'glass-card'}`}>
+                    <div className={`p-4 sm:p-6 md:p-8 rounded-3xl ${isDarkMode ? 'glass-card-dark' : 'glass-card'}`}>
                       <div className="flex justify-between items-center mb-4">
-                          <h2 className="text-xl font-semibold">En cours</h2>
+                          <h2 className="text-lg sm:text-xl font-semibold">En cours</h2>
                           <span className="text-xs font-bold px-2 py-1 rounded-lg bg-opacity-20" style={{backgroundColor: theme.primary, color: theme.text}}>
                               {getEstimatedEndTime()}
                           </span>
@@ -998,9 +1003,9 @@
                   
                   {/* HISTORIQUE TÂCHES */}
                   {completedTasks.length > 0 && (
-                    <div className={`p-8 rounded-3xl ${isDarkMode ? 'glass-card-dark' : 'glass-card'}`}>
+                    <div className={`p-4 sm:p-6 md:p-8 rounded-3xl ${isDarkMode ? 'glass-card-dark' : 'glass-card'}`}>
                       <div className="flex justify-between items-center mb-4">
-                         <h2 className="text-xl font-semibold">Historique Tâches</h2>
+                         <h2 className="text-lg sm:text-xl font-semibold">Historique Tâches</h2>
                          <button onClick={clearAllCompletedTasks} className="text-xs px-2 py-1 bg-red-100 text-red-600 border border-red-200 rounded hover:bg-red-200">Effacer</button>
                       </div>
                       <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
