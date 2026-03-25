@@ -817,14 +817,6 @@
                               <button onClick={stopTimer} className={`w-16 h-16 sm:w-20 sm:h-20 rounded-3xl flex items-center justify-center ${isDarkMode ? 'glass-card-dark' : 'glass-card'} hover:scale-105 transition-all`}><div className="stop-icon scale-125 sm:scale-150"></div></button>
                               <button onClick={resetTimer} className={`w-16 h-16 sm:w-20 sm:h-20 rounded-3xl flex items-center justify-center ${isDarkMode ? 'glass-card-dark' : 'glass-card'} hover:scale-105 transition-all`}><div className="reset-icon scale-125 sm:scale-150"></div></button>
                           </div>
-                          
-                          {/* Stats du jour */}
-                          <div className="text-center">
-                              <div className={`text-base sm:text-lg lg:text-xl font-light py-3 px-6 lg:py-4 lg:px-8 rounded-3xl inline-block ${isDarkMode ? 'glass-card-dark' : 'glass-card'}`} style={{color: theme.text}}>
-                                  Aujourd'hui : {todayPomodoros} pomodoro{todayPomodoros > 1 ? 's' : ''}<br/>
-                                  <span className="text-sm sm:text-base opacity-70">({Math.floor(todayMinutes / 60)}h {todayMinutes % 60}m)</span>
-                              </div>
-                          </div>
                       </div>
                   </div>
                   
