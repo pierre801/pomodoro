@@ -799,8 +799,8 @@
                       <div className="flex flex-col gap-4 sm:gap-6 lg:gap-8">
                           {/* État TRAVAIL/PAUSE */}
                           <div className="text-center">
-                              <span className={`text-2xl sm:text-3xl lg:text-4xl font-light tracking-wide px-6 py-3 lg:px-8 lg:py-4 rounded-3xl inline-block ${isDarkMode ? 'glass-card-dark' : 'glass-card'} ${isWorkSession ? 'animate-pulse' : ''}`} style={{color: theme.text}}>
-                                  {isWorkSession ? '⚡ TRAVAIL' : '☕ PAUSE'}
+                              <span className={`text-2xl sm:text-3xl lg:text-4xl font-bold tracking-wide px-6 py-3 lg:px-8 lg:py-4 rounded-3xl inline-block ${isDarkMode ? 'glass-card-dark' : 'glass-card'} ${isWorkSession ? 'animate-pulse' : ''}`} style={{color: theme.text}}>
+                                  {isWorkSession ? 'TRAVAIL' : 'PAUSE'}
                               </span>
                           </div>
                           
