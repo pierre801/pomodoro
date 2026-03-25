@@ -86,16 +86,34 @@
         
         .seiko-clock-bg {
             background: radial-gradient(circle, #fafaf8 0%, #f5f5f0 100%);
-            border: 8px solid;
+            border: 4px solid;
             box-shadow: 
                 0 0 0 2px rgba(0,0,0,0.1),
                 0 8px 24px rgba(0,0,0,0.12),
                 inset 0 2px 4px rgba(255,255,255,0.5);
         }
         
+        @media (min-width: 640px) {
+            .seiko-clock-bg {
+                border: 6px solid;
+            }
+            .seiko-clock-bg-dark {
+                border: 6px solid;
+            }
+        }
+        
+        @media (min-width: 1024px) {
+            .seiko-clock-bg {
+                border: 8px solid;
+            }
+            .seiko-clock-bg-dark {
+                border: 8px solid;
+            }
+        }
+        
         .seiko-clock-bg-dark {
             background: radial-gradient(circle, #2a2a28 0%, #1f1f1d 100%);
-            border: 8px solid;
+            border: 4px solid;
             box-shadow: 
                 0 0 0 2px rgba(255,255,255,0.1),
                 0 8px 24px rgba(0,0,0,0.3),
@@ -171,7 +189,7 @@
             const secondHandY = radius + secondHandLength * Math.sin(secondsAngle * Math.PI / 180);
             
             return (
-                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none w-full h-full">
+                <div className="absolute inset-0 pointer-events-none">
                     <svg viewBox={`0 0 ${radius * 2} ${radius * 2}`} className="w-full h-full">
                         {/* Track */}
                         <circle stroke={trackColor} strokeWidth={stroke} fill="transparent" r={normalizedRadius} cx={radius} cy={radius} opacity="0.15" />
@@ -750,39 +768,35 @@
             <div className="transition-colors duration-500">
               
               {/* TIMER XXL - FULL SCREEN ABOVE THE FOLD */}
-              <div className={`min-h-screen flex items-center justify-center px-4 md:px-8 py-8 relative ${isDarkMode ? 'gradient-bg-dark' : 'gradient-bg'}`}>
+              <div className={`min-h-screen flex items-center justify-center px-4 md:px-8 py-6 md:py-8 relative ${isDarkMode ? 'gradient-bg-dark' : 'gradient-bg'}`}>
                   
                   {/* TIMER EN 2 COLONNES */}
-                  <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+                  <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-12 items-center">
                       {/* COLONNE GAUCHE : CHRONOMÈTRE GÉANT */}
-                      <div className="flex items-center justify-center">
-                          <div className="relative w-full flex justify-center">
-                              {/* Fond style Seiko - Responsive */}
-                              <div className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 rounded-full ${isDarkMode ? 'seiko-clock-bg-dark' : 'seiko-clock-bg'}`} style={{
-                                  width: 'min(90vw, 600px)',
-                                  height: 'min(90vw, 600px)',
-                                  maxWidth: '600px',
-                                  maxHeight: '600px',
+                      <div className="flex items-center justify-center w-full">
+                          <div className="relative w-full max-w-[600px] aspect-square max-h-[85vh] lg:max-h-none">
+                              {/* Fond style Seiko - prend 100% du conteneur */}
+                              <div className={`absolute inset-0 rounded-full ${isDarkMode ? 'seiko-clock-bg-dark' : 'seiko-clock-bg'}`} style={{
                                   borderColor: isDarkMode ? '#3a3a38' : '#d4d4d0'
                               }}></div>
                               
-                              {/* ProgressRing responsive avec SVG viewBox */}
-                              <div className="relative" style={{width: 'min(90vw, 600px)', height: 'min(90vw, 600px)', maxWidth: '600px', maxHeight: '600px'}}>
-                                  <ProgressRing radius={300} stroke={6} progress={progressPercentage} color={theme.primary} trackColor={isDarkMode ? '#4a4a4a' : '#d1d5db'} timeLeft={timeLeft} textColor={theme.text} />
-                                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center w-full px-4">
-                                      <div className="timer-text text-5xl sm:text-6xl md:text-7xl lg:text-8xl xl:text-9xl tracking-tight mb-2" style={{color: theme.text}}>{formatTime(timeLeft)}</div>
-                                      {activeTaskId && (
-                                          <div className="mt-2 md:mt-4 text-sm md:text-base lg:text-lg font-medium opacity-70 max-w-xs mx-auto truncate px-2" style={{color: theme.secondary}}>
-                                              {tasksInProgress.find(t => t.id === activeTaskId)?.name || ''}
-                                          </div>
-                                      )}
-                                  </div>
+                              {/* ProgressRing - prend 100% du conteneur */}
+                              <ProgressRing radius={300} stroke={6} progress={progressPercentage} color={theme.primary} trackColor={isDarkMode ? '#4a4a4a' : '#d1d5db'} timeLeft={timeLeft} textColor={theme.text} />
+                              
+                              {/* Texte centré */}
+                              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center w-full px-2 sm:px-4">
+                                  <div className="timer-text text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl 2xl:text-9xl tracking-tight mb-1 sm:mb-2" style={{color: theme.text}}>{formatTime(timeLeft)}</div>
+                                  {activeTaskId && (
+                                      <div className="mt-1 sm:mt-2 md:mt-4 text-xs sm:text-sm md:text-base lg:text-lg font-medium opacity-70 max-w-xs mx-auto truncate px-2" style={{color: theme.secondary}}>
+                                          {tasksInProgress.find(t => t.id === activeTaskId)?.name || ''}
+                                      </div>
+                                  )}
                               </div>
                           </div>
                       </div>
                       
                       {/* COLONNE DROITE : CONTRÔLES & INFOS */}
-                      <div className="flex flex-col gap-6 lg:gap-8">
+                      <div className="flex flex-col gap-4 sm:gap-6 lg:gap-8">
                           {/* État TRAVAIL/PAUSE */}
                           <div className="text-center">
                               <span className={`text-2xl sm:text-3xl lg:text-4xl font-light tracking-wide px-6 py-3 lg:px-8 lg:py-4 rounded-3xl inline-block ${isDarkMode ? 'glass-card-dark' : 'glass-card'} ${isWorkSession ? 'animate-pulse' : ''}`} style={{color: theme.text}}>
@@ -877,7 +891,7 @@
                   
                 </div>
                 
-                <div className="space-y-6">
+                <div className="space-y-4 md:space-y-6">
                   <div className={`p-4 sm:p-6 md:p-8 rounded-3xl ${isDarkMode ? 'glass-card-dark' : 'glass-card'}`}>
                     <div className="flex justify-between items-center mb-4">
                         <h2 className="text-lg sm:text-xl font-semibold">Réglages</h2>
