@@ -5,13 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pomodoro Focus Timer</title>
     
-    <!-- FAVICON -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍅</text></svg>">
-
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
+    
     <style>
         body { margin: 0; padding: 0; font-family: 'Poppins', sans-serif; transition: background-color 0.5s ease, color 0.5s ease; overflow-x: hidden; }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
@@ -51,7 +50,6 @@
         .checkbox-custom:checked::after { content: '✓'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 14px; font-weight: bold; color: currentColor; }
         .subtask-completed { opacity: 0.5; text-decoration: line-through; }
         
-        /* Glassmorphism & Modern Design */
         .glass-card {
             background: rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(10px);
@@ -59,7 +57,6 @@
             border: 1px solid rgba(255, 255, 255, 0.2);
             box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
         }
-        
         .glass-card-dark {
             background: rgba(0, 0, 0, 0.2);
             backdrop-filter: blur(10px);
@@ -68,16 +65,9 @@
             box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
         }
         
-        /* Fond dégradé subtil */
-        .gradient-bg {
-            background: linear-gradient(135deg, #f5e6d3 0%, #faf5f0 50%, #f9e8e0 100%);
-        }
+        .gradient-bg { background: linear-gradient(135deg, #f5e6d3 0%, #faf5f0 50%, #f9e8e0 100%); }
+        .gradient-bg-dark { background: linear-gradient(135deg, #2d1810 0%, #3d2418 50%, #2a1f1a 100%); }
         
-        .gradient-bg-dark {
-            background: linear-gradient(135deg, #2d1810 0%, #3d2418 50%, #2a1f1a 100%);
-        }
-        
-        /* Timer style Seiko */
         .timer-text {
             font-weight: 700;
             letter-spacing: -0.05em;
@@ -92,25 +82,6 @@
                 0 8px 24px rgba(0,0,0,0.12),
                 inset 0 2px 4px rgba(255,255,255,0.5);
         }
-        
-        @media (min-width: 640px) {
-            .seiko-clock-bg {
-                border: 6px solid;
-            }
-            .seiko-clock-bg-dark {
-                border: 6px solid;
-            }
-        }
-        
-        @media (min-width: 1024px) {
-            .seiko-clock-bg {
-                border: 8px solid;
-            }
-            .seiko-clock-bg-dark {
-                border: 8px solid;
-            }
-        }
-        
         .seiko-clock-bg-dark {
             background: radial-gradient(circle, #2a2a28 0%, #1f1f1d 100%);
             border: 4px solid;
@@ -118,6 +89,21 @@
                 0 0 0 2px rgba(255,255,255,0.1),
                 0 8px 24px rgba(0,0,0,0.3),
                 inset 0 2px 4px rgba(255,255,255,0.05);
+        }
+        @media (min-width: 640px) {
+            .seiko-clock-bg, .seiko-clock-bg-dark { border: 6px solid; }
+        }
+        @media (min-width: 1024px) {
+            .seiko-clock-bg, .seiko-clock-bg-dark { border: 8px solid; }
+        }
+        
+        /* Animation pulse pour tâche active */
+        @keyframes pulse-glow {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.75; }
+        }
+        .active-task-pulse {
+            animation: pulse-glow 2s ease-in-out infinite;
         }
     </style>
 </head>
@@ -130,7 +116,6 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        // THEME PHAROW ONLY
         const THEME = {
             day: { bg: "#FBDEC4", card: "#FEFAF5", text: "#151515", primary: "#F2994A", secondary: "#151515", accent: "#22C55E", border: "#151515" },
             night: { bg: "#2C1810", card: "#432818", text: "#FBDEC4", primary: "#F2994A", secondary: "#FBDEC4", accent: "#22C55E", border: "#6B4226" }
@@ -143,14 +128,12 @@
             const circumference = normalizedRadius * 2 * Math.PI;
             const strokeDashoffset = circumference - (progress / 100) * circumference;
             
-            // Calculer l'angle de l'aiguille des secondes (sens horaire)
             const seconds = timeLeft % 60;
-            const secondsAngle = -90 - (seconds * 6); // Sens horaire inversé
+            const secondsAngle = -90 - (seconds * 6);
             
-            // Générer les traits de minutes (60 traits)
             const minuteMarks = [];
             for (let i = 0; i < 60; i++) {
-                const angle = (i * 6) - 90; // 6° par minute, -90 pour commencer en haut
+                const angle = (i * 6) - 90;
                 const isFiveMinute = i % 5 === 0;
                 const isQuarterHour = i % 15 === 0;
                 
@@ -165,7 +148,6 @@
                 const x2 = radius + innerRadius * Math.cos(angle * Math.PI / 180);
                 const y2 = radius + innerRadius * Math.sin(angle * Math.PI / 180);
                 
-                // Les traits de 5 minutes utilisent textColor (noir), les autres restent avec color
                 const strokeColor = isFiveMinute ? textColor : color;
                 const strokeOpacity = isQuarterHour ? 0.9 : (isFiveMinute ? 0.8 : 0.3);
                 
@@ -183,7 +165,6 @@
                 );
             }
             
-            // Aiguille des secondes (rouge, comme Seiko)
             const secondHandLength = normalizedRadius - 30;
             const secondHandX = radius + secondHandLength * Math.cos(secondsAngle * Math.PI / 180);
             const secondHandY = radius + secondHandLength * Math.sin(secondsAngle * Math.PI / 180);
@@ -191,16 +172,10 @@
             return (
                 <div className="absolute inset-0 pointer-events-none">
                     <svg viewBox={`0 0 ${radius * 2} ${radius * 2}`} className="w-full h-full">
-                        {/* Track */}
                         <circle stroke={trackColor} strokeWidth={stroke} fill="transparent" r={normalizedRadius} cx={radius} cy={radius} opacity="0.15" />
-                        
-                        {/* Progress - Rouge épais avec extrémités plates */}
                         <circle className="progress-ring__circle" stroke="#EF4444" strokeWidth={20} strokeDasharray={circumference + ' ' + circumference} style={{ strokeDashoffset }} strokeLinecap="butt" fill="transparent" r={normalizedRadius} cx={radius} cy={radius} />
-                        
-                        {/* Traits de minutes */}
                         {minuteMarks}
                         
-                        {/* Logo PHAROW style Seiko */}
                         <text 
                             x={radius}
                             y={radius - 100}
@@ -235,7 +210,6 @@
                             QUARTZ
                         </text>
                         
-                        {/* Aiguille des secondes (rouge style Seiko) */}
                         <line 
                             x1={radius} 
                             y1={radius} 
@@ -244,12 +218,9 @@
                             stroke="#EF4444" 
                             strokeWidth="2" 
                             strokeLinecap="round"
-                            style={{
-                                transition: 'all 0.3s linear'
-                            }}
+                            style={{ transition: 'all 0.3s linear' }}
                         />
                         
-                        {/* Centre de l'aiguille */}
                         <circle 
                             cx={radius} 
                             cy={radius} 
@@ -343,8 +314,6 @@
           }, []);
 
           const toggleDarkMode = () => { const newMode = !isDarkMode; setIsDarkMode(newMode); localStorage.setItem('pomodoroDarkMode', newMode.toString()); };
-          
-          
 
           useEffect(() => { document.title = isRunning ? `[${Math.floor(timeLeft / 60)}'] Pomodoro` : "Pomodoro Focus Timer"; }, [timeLeft, isRunning]);
 
@@ -413,7 +382,6 @@
             playBellSound();
             
             if (isWorkSession) {
-                // Fin d'une session de travail
                 const newPomodoros = todayPomodoros + 1;
                 setTodayPomodoros(newPomodoros);
                 localStorage.setItem('todayPomodoros', newPomodoros.toString());
@@ -431,15 +399,12 @@
 
                 checkDailyReset();
                 
-                // Incrémenter le cycle et passer en pause
                 let nextCycle = currentCycle + 1;
                 if (nextCycle > 4) nextCycle = 1;
                 setCurrentCycle(nextCycle);
                 
-                // Décider si pause courte ou longue
                 let nextDuration = 0;
                 if (nextCycle === 1) {
-                    // Après le 4ème cycle, pause longue puis reset
                     nextDuration = longBreak * 60;
                     sendNotification("Pause Longue", "On souffle !");
                 } else {
@@ -451,7 +416,6 @@
                 setTimeLeft(nextDuration);
                 setTotalTimeForCurrentSession(nextDuration);
             } else {
-                // Fin d'une pause, retour au travail
                 const nextDuration = Math.max(60, workTime * 60);
                 setIsWorkSession(true);
                 setTimeLeft(nextDuration);
@@ -660,12 +624,10 @@
               let simCycle = currentCycle;
 
               while (totalRemainingSteps > 0) {
-                  // Ajouter une session de travail
                   minutesNeeded += workTime;
                   totalRemainingSteps--;
                   
                   if (totalRemainingSteps > 0) {
-                      // Ajouter une pause après le travail
                       simCycle++;
                       if (simCycle > 4) simCycle = 1;
                       
@@ -764,38 +726,32 @@
           const changeMediaMode = (mode) => { setMediaMode(mode); localStorage.setItem('pomodoroMediaMode', mode); };
           const handleCalendarEmailChange = (e) => { const val = e.target.value; setCalendarEmail(val); localStorage.setItem('pomodoroCalendarEmail', val); };
 
+          // Récupérer la tâche active
+          const activeTask = activeTaskId ? tasksInProgress.find(t => t.id === activeTaskId) : null;
+
           return (
             <div className="transition-colors duration-500">
               
-              {/* TIMER XXL - FULL SCREEN ABOVE THE FOLD */}
+              {/* TIMER XXL */}
               <div className={`min-h-screen flex items-center justify-center px-4 md:px-8 py-6 md:py-8 relative ${isDarkMode ? 'gradient-bg-dark' : 'gradient-bg'}`}>
                   
-                  {/* TIMER EN 2 COLONNES */}
                   <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-12 items-center">
-                      {/* COLONNE GAUCHE : CHRONOMÈTRE GÉANT */}
+                      {/* COLONNE GAUCHE */}
                       <div className="flex items-center justify-center w-full">
                           <div className="relative w-full max-w-[600px] aspect-square max-h-[85vh] lg:max-h-none">
-                              {/* Fond style Seiko - prend 100% du conteneur */}
                               <div className={`absolute inset-0 rounded-full ${isDarkMode ? 'seiko-clock-bg-dark' : 'seiko-clock-bg'}`} style={{
                                   borderColor: isDarkMode ? '#3a3a38' : '#d4d4d0'
                               }}></div>
                               
-                              {/* ProgressRing - prend 100% du conteneur */}
                               <ProgressRing radius={300} stroke={6} progress={progressPercentage} color={theme.primary} trackColor={isDarkMode ? '#4a4a4a' : '#d1d5db'} timeLeft={timeLeft} textColor={theme.text} />
                               
-                              {/* Texte centré */}
                               <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center w-full px-2 sm:px-4">
                                   <div className="timer-text text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl 2xl:text-9xl tracking-tight mb-1 sm:mb-2" style={{color: theme.text}}>{formatTime(timeLeft)}</div>
-                                  {activeTaskId && (
-                                      <div className="mt-1 sm:mt-2 md:mt-4 text-xs sm:text-sm md:text-base lg:text-lg font-medium opacity-70 max-w-xs mx-auto truncate px-2" style={{color: theme.secondary}}>
-                                          {tasksInProgress.find(t => t.id === activeTaskId)?.name || ''}
-                                      </div>
-                                  )}
                               </div>
                           </div>
                       </div>
                       
-                      {/* COLONNE DROITE : CONTRÔLES & INFOS */}
+                      {/* COLONNE DROITE */}
                       <div className="flex flex-col gap-4 sm:gap-6 lg:gap-8">
                           {/* État TRAVAIL/PAUSE */}
                           <div className="text-center">
@@ -809,7 +765,7 @@
                               Cycle {currentCycle}/4
                           </div>
                           
-                          {/* Boutons de contrôle */}
+                          {/* Boutons contrôle */}
                           <div className="flex justify-center gap-3 lg:gap-4">
                               <button onClick={toggleTimer} className={`w-16 h-16 sm:w-20 sm:h-20 rounded-3xl transition-all flex items-center justify-center ${isDarkMode ? 'glass-card-dark' : 'glass-card'} hover:scale-105`}>
                                   {isRunning ? <div className="pause-icon scale-125 sm:scale-150"><div className="pause-bar"></div><div className="pause-bar"></div></div> : <div className="play-icon scale-125 sm:scale-150"></div>}
@@ -817,19 +773,41 @@
                               <button onClick={stopTimer} className={`w-16 h-16 sm:w-20 sm:h-20 rounded-3xl flex items-center justify-center ${isDarkMode ? 'glass-card-dark' : 'glass-card'} hover:scale-105 transition-all`}><div className="stop-icon scale-125 sm:scale-150"></div></button>
                               <button onClick={resetTimer} className={`w-16 h-16 sm:w-20 sm:h-20 rounded-3xl flex items-center justify-center ${isDarkMode ? 'glass-card-dark' : 'glass-card'} hover:scale-105 transition-all`}><div className="reset-icon scale-125 sm:scale-150"></div></button>
                           </div>
+                          
+                          {/* === TÂCHE EN COURS ROUGE === */}
+                          {activeTask && (
+                              <div className="text-center px-2 sm:px-4">
+                                  <div className={`${isDarkMode ? 'glass-card-dark' : 'glass-card'} rounded-3xl px-4 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6`}>
+                                      <div className="text-xs sm:text-sm font-semibold uppercase tracking-wider mb-2 opacity-50" style={{color: theme.text}}>
+                                          En cours
+                                      </div>
+                                      <div className="text-2xl sm:text-3xl lg:text-4xl xl:text-5xl font-bold tracking-tight mb-3 active-task-pulse leading-tight" style={{color: '#EF4444'}}>
+                                          {activeTask.name}
+                                      </div>
+                                      <div className="text-sm sm:text-base opacity-70" style={{color: theme.text}}>
+                                          <span className="font-semibold">{formatCycles(activeTask.spentCycles || 0)}</span>
+                                          {isWorkSession && isRunning && (
+                                              <span className="ml-1 text-xs animate-pulse">(+1)</span>
+                                          )}
+                                          <span className="mx-2">/</span>
+                                          <span>{formatCycles(activeTask.targetCycles)}</span>
+                                      </div>
+                                  </div>
+                              </div>
+                          )}
                       </div>
                   </div>
                   
               </div>
               
-              {/* CONTENU SCROLLABLE - 2 COLONNES */}
+              {/* CONTENU SCROLLABLE */}
               <div className="w-full" style={{backgroundColor: theme.bg}}>
               <div className="max-w-7xl mx-auto px-4 md:px-8 pb-10 pt-10">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
                 <div className="space-y-4 md:space-y-6">
-                  <div className={`p-4 sm:p-6 md:p-4 sm:p-6 md:p-8 rounded-3xl ${isDarkMode ? 'glass-card-dark' : 'glass-card'}`}>
+                  <div className={`p-4 sm:p-6 md:p-8 rounded-3xl ${isDarkMode ? 'glass-card-dark' : 'glass-card'}`}>
                     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-3">
-                        <h2 className="text-lg sm:text-lg sm:text-xl font-semibold">Espace Focus</h2>
+                        <h2 className="text-lg sm:text-xl font-semibold">Espace Focus</h2>
                         <div className="flex gap-2">
                             <button onClick={() => changeMediaMode('video')} className={`px-3 py-1 rounded-lg text-xs font-bold transition ${mediaMode === 'video' ? 'opacity-100' : 'opacity-50'}`} style={mediaMode === 'video' ? primaryBtnStyle : secondaryBtnStyle}>🎥 Vidéo</button>
                             <button onClick={() => changeMediaMode('calendar')} className={`px-3 py-1 rounded-lg text-xs font-bold transition ${mediaMode === 'calendar' ? 'opacity-100' : 'opacity-50'}`} style={mediaMode === 'calendar' ? primaryBtnStyle : secondaryBtnStyle}>📅 Agenda</button>
