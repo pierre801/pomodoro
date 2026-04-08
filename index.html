@@ -126,7 +126,7 @@
         const ProgressRing = ({ radius, stroke, progress, color, trackColor, timeLeft, textColor }) => {
             const normalizedRadius = radius - stroke * 2;
             const circumference = normalizedRadius * 2 * Math.PI;
-            const strokeDashoffset = circumference - (progress / 100) * circumference;
+            const strokeDashoffset = (progress / 100) * circumference - circumference;
             
             const seconds = timeLeft % 60;
             const secondsAngle = -90 - (seconds * 6);
