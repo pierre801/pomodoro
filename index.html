@@ -129,7 +129,7 @@
             const strokeDashoffset = circumference - (progress / 100) * circumference;
             
             const seconds = timeLeft % 60;
-            const secondsAngle = 90 - (seconds * 6);
+            const secondsAngle = -90 - (seconds * 6);
             
             const minuteMarks = [];
             for (let i = 0; i < 60; i++) {
